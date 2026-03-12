@@ -115,7 +115,7 @@ COPY --from=proton-ge /opt/proton-ge /opt/proton-ge
 COPY --from=python-venv /usr/local/lib/python3.12 /usr/local/lib/python3.12
 COPY --from=python-venv /usr/local/bin/python3.12 /usr/local/bin/python3.12
 COPY --from=python-venv /usr/local/lib/libpython3.12.so* /usr/local/lib/
-RUN ldconfig
+RUN ln -sf /usr/local/bin/python3.12 /usr/local/bin/python && ldconfig
 
 # Copy Python venv
 COPY --from=python-venv /app/venv /app/venv
