@@ -110,7 +110,7 @@
       <div class="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
         <span class="text-gray-300 font-semibold text-sm">🖥 Server Configuration</span>
       </div>
-      <div class="p-4 space-y-3">
+      <div class="p-4 space-y-3 overflow-y-auto" style="max-height: calc(100vh - 280px)">
         <div class="text-xs text-yellow-400 bg-yellow-900/30 border border-yellow-700 rounded px-3 py-2">
           Changes take effect on next server start.
         </div>
@@ -152,6 +152,61 @@
               <span x-text="showPwd ? '🙈' : '👁'"></span>
             </button>
           </div>
+        </div>
+
+        <!-- Admin Password -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">SERVER_ADMIN_PASSWORD</label>
+          <div class="flex gap-1">
+            <input :type="showAdminPwd ? 'text' : 'password'" x-model="config.SERVER_ADMIN_PASSWORD"
+              placeholder="RCON / in-game admin"
+              class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono min-w-0">
+            <button type="button" @click="showAdminPwd = !showAdminPwd"
+              class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 shrink-0">
+              <span x-text="showAdminPwd ? '🙈' : '👁'"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Separator: Networking -->
+        <div class="border-t border-gray-700 pt-2 mt-2">
+          <span class="text-xs text-gray-500 uppercase tracking-wider">Networking</span>
+        </div>
+
+        <!-- Game Port -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">ASA_PORT</label>
+          <input type="number" x-model="config.ASA_PORT" min="1024" max="65535"
+            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+        </div>
+
+        <!-- Query Port -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">QUERY_PORT</label>
+          <input type="number" x-model="config.QUERY_PORT" min="1024" max="65535"
+            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+        </div>
+
+        <!-- RCON Port -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">RCON_PORT</label>
+          <input type="number" x-model="config.RCON_PORT" min="1024" max="65535"
+            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+        </div>
+
+        <!-- RCON Enabled -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">RCON_ENABLED</label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" x-model="rconEnabled"
+              class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900">
+            <span class="text-xs text-gray-400" x-text="rconEnabled ? 'Enabled' : 'Disabled'"></span>
+          </label>
+        </div>
+
+        <!-- Separator: Gameplay -->
+        <div class="border-t border-gray-700 pt-2 mt-2">
+          <span class="text-xs text-gray-500 uppercase tracking-wider">Gameplay</span>
         </div>
 
         <!-- BattlEye -->
@@ -531,11 +586,18 @@
           SESSION_NAME: '',
           MAX_PLAYERS: '70',
           SERVER_PASSWORD: '',
+          SERVER_ADMIN_PASSWORD: '',
+          ASA_PORT: '7777',
+          QUERY_PORT: '27015',
+          RCON_PORT: '27020',
+          RCON_ENABLED: 'True',
           BATTLEYE: 'False',
           CUSTOM_SERVER_ARGS: '',
         },
         battleye: false,
+        rconEnabled: true,
         showPwd: false,
+        showAdminPwd: false,
         saving: false,
         saveMsg: '',
         saveMsgOk: true,
@@ -555,6 +617,7 @@
               // Merge loaded values over defaults
               Object.assign(this.config, data.config || {});
               this.battleye = this.config.BATTLEYE === 'True' || this.config.BATTLEYE === 'true';
+              this.rconEnabled = this.config.RCON_ENABLED !== 'False' && this.config.RCON_ENABLED !== 'false';
             }
           } catch(e) { console.error('Failed to load server config', e); }
         },
@@ -562,8 +625,9 @@
         async saveConfig() {
           this.saving = true;
           this.saveMsg = '';
-          // Sync checkbox to config
+          // Sync checkboxes to config
           this.config.BATTLEYE = this.battleye ? 'True' : 'False';
+          this.config.RCON_ENABLED = this.rconEnabled ? 'True' : 'False';
           try {
             const res = await fetch('/api/server-config', {
               method: 'POST',
