@@ -37,8 +37,17 @@ async def lifespan(app: FastAPI):
 
     log_manager.start_tailing(settings.ARK_LOG_PATH)
     yield
-    # Shutdown
-    log_manager.stop()
+    # Shutdown — gracefully stop ARK if running (handles container SIGTERM)
+    from app.server_manager import server_manager
+    try:
+        if await server_manager.is_running():
+            logger.info("Shutdown: initiating graceful ARK server stop...")
+            await server_manager._do_stop()
+            logger.info("Shutdown: ARK server stopped")
+    except Exception:
+        logger.exception("Shutdown: failed to gracefully stop ARK server")
+    finally:
+        log_manager.stop()
 
 
 app = FastAPI(title="ASA Manager", version="1.0.0", lifespan=lifespan)

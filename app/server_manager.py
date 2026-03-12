@@ -1,53 +1,40 @@
 import asyncio
+import logging
 import os
 import time
 from typing import Optional
 
+from app import supervisor_client
 from app.config import settings
 from app.log_manager import log_manager
 from app.rcon_client import RconClient
 
+logger = logging.getLogger(__name__)
+
 
 class ServerManager:
     def __init__(self):
-        self._process: Optional[asyncio.subprocess.Process] = None
-        self._start_time: Optional[float] = None
-        self._log_task: Optional[asyncio.Task] = None
-        self._install_log_task: Optional[asyncio.Task] = None
         self._lock = asyncio.Lock()
+        self._stopping = False
+        self._stop_task: Optional[asyncio.Task] = None
+        self._install_log_task: Optional[asyncio.Task] = None
 
-    def is_running(self) -> bool:
-        return self._process is not None and self._process.returncode is None
-
-    async def _read_streams(self) -> None:
-        if self._process is None:
-            return
-        tasks = []
-        for stream in (self._process.stdout, self._process.stderr):
-            if stream is not None:
-                tasks.append(asyncio.create_task(_drain_stream(stream, log_manager._append)))
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+    async def is_running(self) -> bool:
+        return await supervisor_client.is_process_running()
 
     async def start(self) -> dict:
         async with self._lock:
-            if self.is_running():
+            if self._stopping:
+                return {"status": "error", "message": "Server is currently stopping"}
+            if await self.is_running():
                 return {"status": "already_running", "message": "Server is already running"}
-
-            script = "/app/scripts/start_ark.sh"
-            if not os.path.exists(script):
-                return {"status": "error", "message": f"Start script not found: {script}"}
-
-            self._process = await asyncio.create_subprocess_exec(
-                "/bin/bash",
-                script,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env={**os.environ},
-            )
-            self._start_time = time.time()
-            self._log_task = asyncio.create_task(self._read_streams())
-            return {"status": "started", "message": f"Server started with PID {self._process.pid}"}
+            try:
+                await supervisor_client.start_process()
+                logger.info("ARK server started via supervisord")
+                return {"status": "started", "message": "Server started"}
+            except Exception as e:
+                logger.exception("Failed to start ARK server")
+                return {"status": "error", "message": str(e)}
 
     async def _rcon(self, cmd: str) -> Optional[str]:
         if not settings.RCON_ENABLED:
@@ -56,41 +43,52 @@ class ServerManager:
             async with RconClient("127.0.0.1", settings.RCON_PORT, settings.SERVER_ADMIN_PASSWORD) as rcon:
                 return await rcon.send_command(cmd)
         except Exception:
+            logger.warning("RCON command '%s' failed", cmd, exc_info=True)
             return None
 
     async def _do_stop(self) -> dict:
         async with self._lock:
-            if not self.is_running():
+            if not await self.is_running():
                 return {"status": "not_running", "message": "Server is not running"}
 
-            await self._rcon("saveworld")
-            await asyncio.sleep(30)
+            self._stopping = True
+            try:
+                logger.info("Saving world before stop...")
+                await self._rcon("saveworld")
+                await asyncio.sleep(30)
 
-            await self._rcon("doexit")
-            await asyncio.sleep(10)
+                logger.info("Sending doexit command...")
+                await self._rcon("doexit")
+                await asyncio.sleep(10)
 
-            if self.is_running():
-                try:
-                    self._process.terminate()
-                except ProcessLookupError:
-                    pass
-                try:
-                    await asyncio.wait_for(self._process.wait(), timeout=15)
-                except asyncio.TimeoutError:
-                    self._process.kill()
+                # Let supervisord handle final cleanup (SIGTERM → SIGKILL after stopwaitsecs)
+                if await self.is_running():
+                    logger.info("Process still running, stopping via supervisord...")
+                    try:
+                        await supervisor_client.stop_process()
+                    except Exception:
+                        logger.warning("supervisord stop_process failed (process may have already exited)")
 
-            self._process = None
-            self._start_time = None
-            if self._log_task:
-                self._log_task.cancel()
-                self._log_task = None
-            return {"status": "stopped", "message": "Server stopped"}
+                logger.info("ARK server stopped")
+                return {"status": "stopped", "message": "Server stopped"}
+            finally:
+                self._stopping = False
 
     async def stop(self) -> dict:
-        if not self.is_running():
+        if not await self.is_running():
             return {"status": "not_running", "message": "Server is not running"}
-        asyncio.create_task(self._do_stop())
+        if self._stopping:
+            return {"status": "stopping", "message": "Server stop already in progress"}
+
+        self._stop_task = asyncio.create_task(self._do_stop())
+        self._stop_task.add_done_callback(self._on_stop_done)
         return {"status": "stopping", "message": "Server stop initiated"}
+
+    def _on_stop_done(self, task: asyncio.Task):
+        self._stop_task = None
+        exc = task.exception()
+        if exc:
+            logger.error("Stop task failed: %s", exc)
 
     async def restart(self) -> dict:
         stop_result = await self._do_stop()
@@ -98,27 +96,41 @@ class ServerManager:
         return {"status": "restarted", "stop": stop_result, "start": start_result}
 
     async def status(self) -> dict:
-        running = self.is_running()
-        pid = self._process.pid if running and self._process else None
-        uptime = int(time.time() - self._start_time) if running and self._start_time else 0
+        try:
+            info = await supervisor_client.get_process_info()
+        except Exception:
+            logger.exception("Failed to get process info from supervisord")
+            return {
+                "running": False,
+                "stopping": self._stopping,
+                "pid": None,
+                "uptime_seconds": 0,
+                "player_count": 0,
+            }
+
+        running = info.get("statename") == "RUNNING"
+        pid = info.get("pid", 0) if running else None
+        start_time = info.get("start", 0)
+        uptime = int(time.time() - start_time) if running and start_time else 0
         player_count = 0
 
         if running:
             response = await self._rcon("listplayers")
             if response:
-                lines = [l for l in response.strip().splitlines() if l.strip()]
+                lines = [line for line in response.strip().splitlines() if line.strip()]
                 if lines and not lines[0].lower().startswith("no players"):
                     player_count = len(lines)
 
         return {
             "running": running,
+            "stopping": self._stopping,
             "pid": pid,
             "uptime_seconds": uptime,
             "player_count": player_count,
         }
 
     async def install(self) -> dict:
-        if self.is_running():
+        if await self.is_running():
             return {"status": "error", "message": "Cannot install while server is running"}
 
         steamcmd = "/usr/bin/steamcmd"
@@ -148,7 +160,7 @@ async def _drain_stream(stream: asyncio.StreamReader, callback) -> None:
             line = line_bytes.decode("utf-8", errors="replace").rstrip("\n")
             callback(line)
     except Exception:
-        pass
+        logger.warning("Stream drain error", exc_info=True)
 
 
 server_manager = ServerManager()
