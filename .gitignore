@@ -1,0 +1,5 @@
+.env
+serverdata/
+__pycache__/
+*.pyc
+.claude/

@@ -1,5 +1,6 @@
 services:
   asa-manager:
+    build: .
     image: crackerformula/asa-manager:latest
     container_name: asa-manager
     restart: unless-stopped
