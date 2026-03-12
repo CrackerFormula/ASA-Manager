@@ -1,4 +1,4 @@
-ARG ALA_DATE=2025/03/10
+ARG ALA_DATE=2026/03/12
 
 # =============================================================================
 # Stage 1: Arch base with ALA date pinning, multilib, and required packages
