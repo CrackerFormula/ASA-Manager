@@ -14,7 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from app.auth import limiter, require_auth, router as auth_router, verify_session_cookie
 from app.config import settings
 from app.log_manager import log_manager
-from app.routers import server, settings as settings_router, logs, mods, schedule, backups
+from app.routers import server, server_config, settings as settings_router, logs, mods, schedule, backups
 from app.scheduler import scheduler
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,7 @@ app.include_router(auth_router)
 app.include_router(server.router, dependencies=[Depends(require_auth)])
 app.include_router(settings_router.router, dependencies=[Depends(require_auth)])
 app.include_router(logs.router, dependencies=[Depends(require_auth)])
+app.include_router(server_config.router, dependencies=[Depends(require_auth)])
 app.include_router(mods.router, dependencies=[Depends(require_auth)])
 app.include_router(schedule.router, dependencies=[Depends(require_auth)])
 app.include_router(backups.router, dependencies=[Depends(require_auth)])

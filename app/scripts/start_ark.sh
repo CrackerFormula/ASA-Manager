@@ -20,6 +20,15 @@ BATTLEYE="${BATTLEYE:-false}"
 MOD_IDS="${MOD_IDS:-}"
 CUSTOM_SERVER_ARGS="${CUSTOM_SERVER_ARGS:-}"
 
+# Override settings from web-managed config file if it exists
+SERVER_CONFIG="/serverdata/config/server.conf"
+if [[ -f "${SERVER_CONFIG}" ]]; then
+    # shellcheck disable=SC1090
+    source "${SERVER_CONFIG}"
+    # Re-encode SESSION_NAME spaces after sourcing
+    SESSION_NAME="${SESSION_NAME// /%20}"
+fi
+
 # Override MOD_IDS from web-managed config file if it exists
 MODS_CONFIG="/serverdata/config/mods.txt"
 if [[ -f "${MODS_CONFIG}" ]]; then

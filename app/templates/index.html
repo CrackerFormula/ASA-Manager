@@ -103,10 +103,90 @@
   </div>
 
   <!-- Main two-column layout -->
-  <main class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-screen-2xl mx-auto">
+  <main class="p-4 grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 max-w-screen-2xl mx-auto">
 
-    <!-- LEFT: Settings Panel -->
-    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden" x-data="settingsPanel()">
+    <!-- LEFT: Server Configuration -->
+    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden" x-data="serverConfigPanel()">
+      <div class="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
+        <span class="text-gray-300 font-semibold text-sm">🖥 Server Configuration</span>
+      </div>
+      <div class="p-4 space-y-3">
+        <div class="text-xs text-yellow-400 bg-yellow-900/30 border border-yellow-700 rounded px-3 py-2">
+          Changes take effect on next server start.
+        </div>
+
+        <!-- Map -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">MAP_NAME</label>
+          <select x-model="config.MAP_NAME"
+            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500">
+            <template x-for="map in knownMaps" :key="map">
+              <option :value="map" x-text="map"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- Session Name -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">SESSION_NAME</label>
+          <input type="text" x-model="config.SESSION_NAME"
+            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+        </div>
+
+        <!-- Max Players -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">MAX_PLAYERS</label>
+          <input type="number" x-model="config.MAX_PLAYERS" min="1" max="200"
+            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+        </div>
+
+        <!-- Server Password -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">SERVER_PASSWORD</label>
+          <div class="flex gap-1">
+            <input :type="showPwd ? 'text' : 'password'" x-model="config.SERVER_PASSWORD"
+              placeholder="Leave blank for public"
+              class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono min-w-0">
+            <button type="button" @click="showPwd = !showPwd"
+              class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 shrink-0">
+              <span x-text="showPwd ? '🙈' : '👁'"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- BattlEye -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">BATTLEYE</label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" x-model="battleye"
+              class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900">
+            <span class="text-xs text-gray-400" x-text="battleye ? 'Enabled' : 'Disabled'"></span>
+          </label>
+        </div>
+
+        <!-- Custom Args -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">CUSTOM_SERVER_ARGS</label>
+          <input type="text" x-model="config.CUSTOM_SERVER_ARGS" placeholder="Extra launch flags"
+            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+        </div>
+
+        <!-- Save button -->
+        <div class="flex items-center gap-3 pt-1">
+          <button @click="saveConfig()" :disabled="saving"
+            class="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center gap-2">
+            <span x-show="!saving">Save Configuration</span>
+            <span x-show="saving" class="flex items-center gap-1"><span class="spinner"></span> Saving…</span>
+          </button>
+          <span x-show="saveMsg" x-text="saveMsg"
+            :class="saveMsgOk ? 'text-green-400' : 'text-red-400'"
+            class="text-xs"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- LEFT: INI Settings Panel -->
+    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden lg:col-start-1" x-data="settingsPanel()">
       <div class="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
         <span class="text-gray-300 font-semibold text-sm">⚙ Settings</span>
       </div>
@@ -214,8 +294,8 @@
       </div>
     </section>
 
-    <!-- RIGHT: Log Viewer -->
-    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden flex flex-col" x-data="logViewer()">
+    <!-- RIGHT: Log Viewer (spans both rows) -->
+    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden flex flex-col lg:row-span-2" x-data="logViewer()">
       <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between shrink-0">
         <span class="text-gray-300 font-semibold text-sm">📋 Server Logs</span>
         <div class="flex items-center gap-3">
@@ -440,6 +520,74 @@
           setTimeout(() => {
             this.toasts = this.toasts.filter(t => t.id !== id);
           }, 4000);
+        }
+      };
+    }
+
+    function serverConfigPanel() {
+      return {
+        config: {
+          MAP_NAME: 'TheIsland_WP',
+          SESSION_NAME: '',
+          MAX_PLAYERS: '70',
+          SERVER_PASSWORD: '',
+          BATTLEYE: 'False',
+          CUSTOM_SERVER_ARGS: '',
+        },
+        battleye: false,
+        showPwd: false,
+        saving: false,
+        saveMsg: '',
+        saveMsgOk: true,
+
+        knownMaps: [
+          'TheIsland_WP', 'TheIsland', 'ScorchedEarth_WP', 'ScorchedEarth_P',
+          'Aberration_WP', 'Aberration_P', 'Extinction', 'Genesis', 'Genesis2',
+          'CrystalIsles', 'Ragnarok', 'Valguero_P', 'LostIsland', 'Fjordur',
+        ],
+
+        async init() {
+          try {
+            const res = await fetch('/api/server-config');
+            if (res.status === 401) { window.location.reload(); return; }
+            if (res.ok) {
+              const data = await res.json();
+              // Merge loaded values over defaults
+              Object.assign(this.config, data.config || {});
+              this.battleye = this.config.BATTLEYE === 'True' || this.config.BATTLEYE === 'true';
+            }
+          } catch(e) { console.error('Failed to load server config', e); }
+        },
+
+        async saveConfig() {
+          this.saving = true;
+          this.saveMsg = '';
+          // Sync checkbox to config
+          this.config.BATTLEYE = this.battleye ? 'True' : 'False';
+          try {
+            const res = await fetch('/api/server-config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ config: this.config })
+            });
+            if (res.status === 401) { window.location.reload(); return; }
+            const data = await res.json();
+            if (res.ok) {
+              this.saveMsg = '✓ Saved';
+              this.saveMsgOk = true;
+              Object.assign(this.config, data.config || {});
+              window._alpineApp?.showToast('success', 'Server config saved');
+            } else {
+              this.saveMsg = '✗ ' + (data.detail || 'Save failed');
+              this.saveMsgOk = false;
+            }
+          } catch(e) {
+            this.saveMsg = '✗ ' + e.message;
+            this.saveMsgOk = false;
+          } finally {
+            this.saving = false;
+            setTimeout(() => { this.saveMsg = ''; }, 3000);
+          }
         }
       };
     }
