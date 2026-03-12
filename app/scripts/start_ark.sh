@@ -19,6 +19,15 @@ BATTLEYE="${BATTLEYE:-false}"
 MOD_IDS="${MOD_IDS:-}"
 CUSTOM_SERVER_ARGS="${CUSTOM_SERVER_ARGS:-}"
 
+# Override MOD_IDS from web-managed config file if it exists
+MODS_CONFIG="/serverdata/config/mods.txt"
+if [[ -f "${MODS_CONFIG}" ]]; then
+    FILE_MODS=$(grep -v '^\s*$' "${MODS_CONFIG}" | tr '\n' ',' | sed 's/,$//')
+    if [[ -n "${FILE_MODS}" ]]; then
+        MOD_IDS="${FILE_MODS}"
+    fi
+fi
+
 # Validate required passwords
 if [[ -z "${SERVER_ADMIN_PASSWORD}" ]]; then
     echo "ERROR: SERVER_ADMIN_PASSWORD is not set. Refusing to start." >&2

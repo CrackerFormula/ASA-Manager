@@ -7,6 +7,13 @@ SERVERDATA_AUTH_RESPONSE = 2
 SERVERDATA_EXECCOMMAND = 2
 SERVERDATA_RESPONSE_VALUE = 0
 
+# Sane packet size limits (bytes)
+_MIN_PACKET_SIZE = 10
+_MAX_PACKET_SIZE = 65536
+
+# Maximum iterations when waiting for auth response
+_AUTH_MAX_ITERATIONS = 10
+
 
 def _pack_packet(packet_id: int, packet_type: int, body: str) -> bytes:
     body_bytes = body.encode("utf-8") + b"\x00\x00"
@@ -42,12 +49,21 @@ class RconClient:
         )
 
     async def authenticate(self) -> None:
+        if self._writer is None:
+            raise RuntimeError("Not connected")
+
         auth_id = self._next_id()
         packet = _pack_packet(auth_id, SERVERDATA_AUTH, self.password)
         self._writer.write(packet)
         await self._writer.drain()
 
+        iterations = 0
         while True:
+            iterations += 1
+            if iterations > _AUTH_MAX_ITERATIONS:
+                raise TimeoutError(
+                    f"RCON authentication: no auth response after {_AUTH_MAX_ITERATIONS} packets"
+                )
             _, resp_id, resp_type, _ = await self._read_packet()
             if resp_type == SERVERDATA_AUTH_RESPONSE:
                 break
@@ -55,13 +71,30 @@ class RconClient:
             raise PermissionError("RCON authentication failed: bad password")
 
     async def _read_packet(self) -> tuple[int, int, int, str]:
-        raw_size = await asyncio.wait_for(self._reader.readexactly(4), timeout=10.0)
+        try:
+            raw_size = await asyncio.wait_for(self._reader.readexactly(4), timeout=10.0)
+        except asyncio.IncompleteReadError as exc:
+            raise ConnectionError("Connection closed while reading packet size") from exc
+
         size = struct.unpack("<i", raw_size)[0]
-        rest = await asyncio.wait_for(self._reader.readexactly(size), timeout=10.0)
+        if size < _MIN_PACKET_SIZE or size > _MAX_PACKET_SIZE:
+            raise ValueError(
+                f"RCON packet size {size} out of valid range "
+                f"({_MIN_PACKET_SIZE}-{_MAX_PACKET_SIZE})"
+            )
+
+        try:
+            rest = await asyncio.wait_for(self._reader.readexactly(size), timeout=10.0)
+        except asyncio.IncompleteReadError as exc:
+            raise ConnectionError("Connection closed while reading packet body") from exc
+
         full = raw_size + rest
         return _unpack_packet(full)
 
     async def send_command(self, cmd: str) -> str:
+        if self._writer is None:
+            raise RuntimeError("Not connected")
+
         cmd_id = self._next_id()
         mirror_id = self._next_id()
 

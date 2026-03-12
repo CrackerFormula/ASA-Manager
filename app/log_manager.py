@@ -89,10 +89,13 @@ class _open_and_tail:
                     # Check for rotation: file gone or inode changed
                     try:
                         current_inode = os.stat(self.path).st_ino
-                        fd_inode = os.fstat(self._file.fileno()).st_ino
+                        # aiofiles wraps the real file object; access its
+                        # fileno via the underlying _file attribute.
+                        raw_file = self._file._file
+                        fd_inode = os.fstat(raw_file.fileno()).st_ino
                         if current_inode != fd_inode:
                             break
-                    except OSError:
+                    except (OSError, AttributeError):
                         break
                     await asyncio.sleep(0.25)
         finally:
