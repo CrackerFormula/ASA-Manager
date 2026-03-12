@@ -1,0 +1,77 @@
+/* ASA Manager - custom styles */
+
+/* Terminal/log panel background */
+.bg-terminal {
+  background-color: #0d1117;
+}
+
+/* Log panel scrollbar */
+.log-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.log-panel::-webkit-scrollbar-track {
+  background: #161b22;
+}
+.log-panel::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 3px;
+}
+.log-panel::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* Settings panel scrollbar */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #161b22;
+}
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 3px;
+}
+
+/* Spinner animation */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* Log line hover highlight */
+.log-line:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-radius: 2px;
+}
+
+/* Settings inputs focus ring */
+input:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px #22c55e;
+}
+
+/* Tab active underline */
+button[x-data] { /* reset */ }
+
+/* Ensure body fills viewport */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 1024px) {
+  .log-panel {
+    max-height: 400px !important;
+  }
+  .overflow-y-auto {
+    max-height: 400px !important;
+  }
+}

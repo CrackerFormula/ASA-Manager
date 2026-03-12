@@ -1,0 +1,41 @@
+services:
+  asa-manager:
+    image: crackerformula/asa-manager:latest
+    container_name: asa-manager
+    restart: unless-stopped
+    ports:
+      - "7777:7777/udp"
+      - "7778:7778/udp"
+      - "27020:27020/tcp"
+      - "8080:8080/tcp"
+    volumes:
+      - ./serverdata:/serverdata
+    environment:
+      # Instance
+      INSTANCE_NAME: ${INSTANCE_NAME:-ASA_Server_1}
+      TZ: ${TZ:-America/New_York}
+      # Server identity
+      MAP_NAME: ${MAP_NAME:-TheIsland_WP}
+      SESSION_NAME: ${SESSION_NAME:-My ARK Server}
+      # Security
+      PYTHONUNBUFFERED: "1"
+      SERVER_ADMIN_PASSWORD: ${SERVER_ADMIN_PASSWORD:-}
+      SERVER_PASSWORD: ${SERVER_PASSWORD:-}
+      # Networking
+      ASA_PORT: ${ASA_PORT:-7777}
+      RCON_PORT: ${RCON_PORT:-27020}
+      RCON_ENABLED: ${RCON_ENABLED:-True}
+      # Gameplay
+      MAX_PLAYERS: ${MAX_PLAYERS:-70}
+      BATTLEYE: ${BATTLEYE:-False}
+      MOD_IDS: ${MOD_IDS:-}
+      CUSTOM_SERVER_ARGS: ${CUSTOM_SERVER_ARGS:-}
+      # Paths
+      INI_PATH: ${INI_PATH:-/serverdata/config/GameUserSettings.ini}
+      ARK_LOG_PATH: ${ARK_LOG_PATH:-/serverdata/ark-server/ShooterGame/Saved/Logs/ShooterGame.log}
+      SERVER_DIR: ${SERVER_DIR:-/serverdata/ark-server}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
