@@ -88,12 +88,9 @@ RUN mkdir -p /opt/proton-ge && \
     | tar -xz -C /opt/proton-ge
 
 # =============================================================================
-# Stage 4: Python venv setup
+# Stage 4: Python venv setup (using Python 3.12 for PyO3 compatibility)
 # =============================================================================
-FROM arch-base AS python-venv
-
-# Install build tools needed to compile native Python packages (watchfiles, uvloop)
-RUN pacman -S --noconfirm --needed base-devel
+FROM python:3.12-slim AS python-venv
 
 COPY requirements.txt /tmp/requirements.txt
 
@@ -113,6 +110,12 @@ COPY --from=steamcmd /root/Steam /root/Steam
 
 # Copy Proton-GE
 COPY --from=proton-ge /opt/proton-ge /opt/proton-ge
+
+# Copy Python 3.12 runtime from the build stage (needed by the venv)
+COPY --from=python-venv /usr/local/lib/python3.12 /usr/local/lib/python3.12
+COPY --from=python-venv /usr/local/bin/python3.12 /usr/local/bin/python3.12
+COPY --from=python-venv /usr/local/lib/libpython3.12.so* /usr/local/lib/
+RUN ldconfig
 
 # Copy Python venv
 COPY --from=python-venv /app/venv /app/venv
