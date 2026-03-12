@@ -92,6 +92,9 @@ RUN mkdir -p /opt/proton-ge && \
 # =============================================================================
 FROM arch-base AS python-venv
 
+# Install build tools needed to compile native Python packages (watchfiles, uvloop)
+RUN pacman -S --noconfirm --needed base-devel
+
 COPY requirements.txt /tmp/requirements.txt
 
 RUN python -m venv /app/venv && \
