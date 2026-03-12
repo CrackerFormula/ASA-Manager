@@ -7,6 +7,7 @@ services:
     ports:
       - "7777:7777/udp"
       - "7778:7778/udp"
+      - "27015:27015/udp"
       - "27020:27020/tcp"
       - "8080:8080/tcp"
     volumes:
@@ -26,6 +27,7 @@ services:
       SERVER_PASSWORD: ${SERVER_PASSWORD:-}
       # Networking
       ASA_PORT: ${ASA_PORT:-7777}
+      QUERY_PORT: ${QUERY_PORT:-27015}
       RCON_PORT: ${RCON_PORT:-27020}
       RCON_ENABLED: ${RCON_ENABLED:-True}
       # Gameplay

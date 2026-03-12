@@ -27,6 +27,7 @@
   <Config Name="Game Port (UDP)" Target="7777" Default="7777" Protocol="udp" Description="ARK game port (UDP). Forward this on your router." Type="Port" Display="always" Required="true" Mask="false">7777</Config>
   <Config Name="Game Port (TCP)" Target="7777" Default="7777" Protocol="tcp" Description="ARK game port (TCP)." Type="Port" Display="always" Required="false" Mask="false">7777</Config>
   <Config Name="Raw UDP Port" Target="7778" Default="7778" Protocol="udp" Description="ARK raw UDP port (GamePort+1). Forward this on your router." Type="Port" Display="always" Required="true" Mask="false">7778</Config>
+  <Config Name="Steam Query Port" Target="27015" Default="27015" Protocol="udp" Description="Steam server browser query port (UDP). Forward this on your router for server to appear in Steam server list." Type="Port" Display="always" Required="true" Mask="false">27015</Config>
   <Config Name="RCON Port" Target="27020" Default="27020" Protocol="tcp" Description="RCON remote console port." Type="Port" Display="always" Required="false" Mask="false">27020</Config>
   <Config Name="Web UI Port" Target="8080" Default="8080" Protocol="tcp" Description="ASA Manager web interface port." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
 
@@ -49,6 +50,7 @@
   <Config Name="Timezone" Target="TZ" Default="America/New_York" Description="Container timezone." Type="Variable" Display="always" Required="false" Mask="false">America/New_York</Config>
   <Config Name="Python Unbuffered" Target="PYTHONUNBUFFERED" Default="1" Description="Ensures real-time log output." Type="Variable" Display="advanced" Required="false" Mask="false">1</Config>
   <Config Name="Game Port (Env)" Target="ASA_PORT" Default="7777" Description="Game port the ARK server listens on. Must match the mapped Game Port above." Type="Variable" Display="advanced" Required="false" Mask="false">7777</Config>
+  <Config Name="Query Port (Env)" Target="QUERY_PORT" Default="27015" Description="Steam query port. Must match the mapped Steam Query Port above." Type="Variable" Display="advanced" Required="false" Mask="false">27015</Config>
   <Config Name="RCON Port (Env)" Target="RCON_PORT" Default="27020" Description="RCON port the server listens on. Must match the mapped RCON Port above." Type="Variable" Display="advanced" Required="false" Mask="false">27020</Config>
   <Config Name="RCON Enabled" Target="RCON_ENABLED" Default="True" Description="Enable RCON remote console (True/False)." Type="Variable" Display="advanced" Required="false" Mask="false">True</Config>
 

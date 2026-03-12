@@ -13,6 +13,7 @@ SERVER_ADMIN_PASSWORD="${SERVER_ADMIN_PASSWORD:-}"
 SERVER_PASSWORD="${SERVER_PASSWORD:-}"
 MAX_PLAYERS="${MAX_PLAYERS:-70}"
 ASA_PORT="${ASA_PORT:-7777}"
+QUERY_PORT="${QUERY_PORT:-27015}"
 RCON_PORT="${RCON_PORT:-27020}"
 RCON_ENABLED="${RCON_ENABLED:-True}"
 BATTLEYE="${BATTLEYE:-false}"
@@ -61,6 +62,7 @@ fi
 # Build launch flags
 LAUNCH_FLAGS=(
     "-Port=${ASA_PORT}"
+    "-QueryPort=${QUERY_PORT}"
     "-WinLiveMaxPlayers=${MAX_PLAYERS}"
 )
 
@@ -84,6 +86,7 @@ echo "Starting ARK: Survival Ascended Server..."
 echo "  Map:          ${MAP_NAME}"
 echo "  Session:      ${SESSION_NAME}"
 echo "  Port:         ${ASA_PORT}"
+echo "  Query Port:   ${QUERY_PORT}"
 echo "  RCON Port:    ${RCON_PORT}"
 echo "  Max Players:  ${MAX_PLAYERS}"
 echo "  BattlEye:     ${BATTLEYE}"

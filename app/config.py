@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     SERVER_PASSWORD: str = ""
     MAX_PLAYERS: int = 70
     ASA_PORT: int = 7777
+    QUERY_PORT: int = 27015
     RCON_PORT: int = 27020
     RCON_ENABLED: bool = True
     BATTLEYE: bool = False
