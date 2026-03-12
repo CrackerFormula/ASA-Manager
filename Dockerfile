@@ -10,8 +10,8 @@ ARG ALA_DATE
 RUN echo "Server=https://archive.archlinux.org/repos/${ALA_DATE}/\$repo/os/\$arch" \
     > /etc/pacman.d/mirrorlist
 
-# Enable multilib repository
-RUN sed -i '/^#\[multilib\]/,/^#Include/{s/^#//}' /etc/pacman.conf
+# Enable multilib repository (append since base image has no commented section)
+RUN printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
 
 # Initialize keyring and update packages
 RUN pacman-key --init && \
