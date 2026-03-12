@@ -17,7 +17,9 @@ services:
       # Server identity
       MAP_NAME: ${MAP_NAME:-TheIsland_WP}
       SESSION_NAME: ${SESSION_NAME:-My ARK Server}
-      # Security
+      # Security (WEB_PASSWORD is required — app will not start without it)
+      WEB_PASSWORD: ${WEB_PASSWORD:?Set WEB_PASSWORD in .env}
+      SECURE_COOKIES: ${SECURE_COOKIES:-false}
       PYTHONUNBUFFERED: "1"
       SERVER_ADMIN_PASSWORD: ${SERVER_ADMIN_PASSWORD:-}
       SERVER_PASSWORD: ${SERVER_PASSWORD:-}

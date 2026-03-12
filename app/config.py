@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     INI_PATH: str = "/serverdata/config/GameUserSettings.ini"
     ARK_LOG_PATH: str = "/serverdata/ark-server/ShooterGame/Saved/Logs/ShooterGame.log"
     SERVER_DIR: str = "/serverdata/ark-server"
+    WEB_PASSWORD: str = ""
+    SESSION_MAX_AGE: int = 86400
+    SECURE_COOKIES: bool = False
 
     class Config:
         env_file = ".env"
