@@ -210,10 +210,13 @@ class ServerManager:
             "+app_update", "2430930", "validate",
             "+quit",
         ]
+        # Ensure HOME is set so SteamCMD finds its config in /home/ark
+        env = {**os.environ, "HOME": "/home/ark"}
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
+            env=env,
         )
         self._install_log_task = asyncio.create_task(_drain_stream(proc.stdout, log_manager._append))
         await proc.wait()
