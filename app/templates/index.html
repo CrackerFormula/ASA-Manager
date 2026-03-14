@@ -13,113 +13,126 @@
       theme: {
         extend: {
           colors: {
-            terminal: '#0d1117',
-            surface: '#161b22',
-            border: '#30363d',
+            ark: {
+              dark: '#0a0e14',
+              panel: '#111827',
+              surface: '#1e2532',
+            }
           }
         }
       }
     }
   </script>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="appState()" x-init="init()">
+<body class="bg-ark-dark text-gray-100 min-h-screen" x-data="appState()" x-init="init()">
 
   <!-- Toast notifications -->
-  <div class="fixed top-4 right-4 z-50 flex flex-col gap-2" x-ref="toastContainer">
+  <div class="fixed top-4 right-4 z-50 flex flex-col gap-2">
     <template x-for="toast in toasts" :key="toast.id">
-      <div class="flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all duration-300"
-           :class="toast.type === 'success' ? 'bg-green-800 border border-green-600 text-green-100' : 'bg-red-800 border border-red-600 text-red-100'">
-        <span x-text="toast.type === 'success' ? '✓' : '✗'"></span>
+      <div class="flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium backdrop-blur-sm"
+           :class="toast.type === 'success'
+             ? 'bg-green-900/90 border border-green-600/50 text-green-100'
+             : 'bg-red-900/90 border border-red-600/50 text-red-100'">
+        <span x-text="toast.type === 'success' ? '✓' : '✗'" class="font-bold"></span>
         <span x-text="toast.message"></span>
       </div>
     </template>
   </div>
 
-  <!-- Header bar -->
-  <header class="bg-gray-900 border-b border-gray-700 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
-    <h1 class="text-xl font-bold text-white flex items-center gap-2">
-      🦕 <span>ASA Manager</span>
-    </h1>
+  <!-- ═══ Header ═══ -->
+  <header class="border-b border-gray-800 px-4 py-3 flex items-center justify-between sticky top-0 z-40 bg-ark-dark/95 backdrop-blur-sm">
+    <h1 class="text-lg font-bold text-white tracking-tight">ASA Manager</h1>
     <div class="flex items-center gap-3">
-      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
-            :class="badgeClass">
-        <span class="w-2 h-2 rounded-full" :class="dotClass"></span>
-        <span x-text="badgeText"></span>
-      </span>
-      <button
-        @click="logout()"
-        class="text-xs px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 transition-colors">
+      <div class="flex items-center gap-2">
+        <div :class="serverStatus.stopping ? 'dot-stopping' : serverStatus.running ? 'dot-running' : 'dot-stopped'"></div>
+        <span class="text-xs font-semibold" :class="serverStatus.stopping ? 'text-yellow-400' : serverStatus.running ? 'text-green-400' : 'text-red-400'"
+              x-text="badgeText"></span>
+      </div>
+      <button @click="logout()"
+        class="text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-gray-200 transition-all">
         Logout
       </button>
     </div>
   </header>
 
-  <!-- Control bar -->
-  <div class="bg-gray-900 border-b border-gray-700 px-4 py-3">
-    <div class="flex flex-wrap gap-2 items-center">
-      <!-- Start -->
-      <button
-        class="btn-action bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-        :disabled="busy || serverStatus.running || serverStatus.stopping"
-        @click="serverAction('start')">
-        <span x-show="!busy || activeAction !== 'start'">▶ Start</span>
-        <span x-show="busy && activeAction === 'start'" class="flex items-center gap-1"><span class="spinner"></span> Starting…</span>
-      </button>
+  <!-- ═══ Status Hero ═══ -->
+  <div class="border-b border-gray-800 px-4 py-5"
+       :class="serverStatus.stopping ? 'hero-stopping' : serverStatus.running ? 'hero-running' : 'hero-stopped'">
+    <div class="max-w-screen-2xl mx-auto">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
 
-      <!-- Stop -->
-      <button
-        class="btn-action bg-red-700 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-        :disabled="busy || !serverStatus.running || serverStatus.stopping"
-        @click="confirmAction('stop', 'Are you sure you want to stop the server? Active players will be disconnected.')">
-        <span x-show="!busy || activeAction !== 'stop'">■ Stop</span>
-        <span x-show="busy && activeAction === 'stop'" class="flex items-center gap-1"><span class="spinner"></span> Stopping…</span>
-      </button>
+        <!-- Status + Stats -->
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4 hero-stats">
+          <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full"
+                 :class="serverStatus.stopping ? 'dot-stopping' : serverStatus.running ? 'dot-running' : 'dot-stopped'"></div>
+            <span class="text-2xl font-bold tracking-tight"
+                  :class="serverStatus.stopping ? 'text-yellow-400' : serverStatus.running ? 'text-green-400' : 'text-red-400'"
+                  x-text="badgeText"></span>
+          </div>
+          <div class="flex flex-wrap items-center gap-4 text-sm text-gray-400">
+            <span x-show="serverStatus.running" class="flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span x-text="formattedUptime"></span>
+            </span>
+            <span x-show="serverStatus.running" class="flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              <span x-text="(serverStatus.player_count ?? 0) + ' players'"></span>
+            </span>
+          </div>
+        </div>
 
-      <!-- Restart -->
-      <button
-        class="btn-action bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-        :disabled="busy || !serverStatus.running || serverStatus.stopping"
-        @click="confirmAction('restart', 'Are you sure you want to restart? Active players will be disconnected.')">
-        <span x-show="!busy || activeAction !== 'restart'">↺ Restart</span>
-        <span x-show="busy && activeAction === 'restart'" class="flex items-center gap-1"><span class="spinner"></span> Restarting…</span>
-      </button>
-
-      <!-- Install/Update -->
-      <button
-        class="btn-action bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-        :disabled="busy || serverStatus.running || serverStatus.stopping"
-        @click="confirmAction('install', 'Are you sure? This will download/update the server files.')">
-        <span x-show="!busy || activeAction !== 'install'">⬇ Install / Update</span>
-        <span x-show="busy && activeAction === 'install'" class="flex items-center gap-1"><span class="spinner"></span> Installing…</span>
-      </button>
-
-      <!-- Status info -->
-      <div class="ml-auto text-xs text-gray-400 flex gap-4">
-        <span x-show="serverStatus.uptime" x-text="'Uptime: ' + serverStatus.uptime"></span>
-        <span x-show="serverStatus.player_count !== null && serverStatus.player_count !== undefined"
-              x-text="'Players: ' + serverStatus.player_count"></span>
+        <!-- Action Buttons -->
+        <div class="flex flex-wrap gap-2 hero-actions">
+          <button
+            class="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all duration-200 bg-green-600 hover:bg-green-500 text-white shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="busy || serverStatus.running || serverStatus.stopping"
+            @click="serverAction('start')">
+            <span x-show="!busy || activeAction !== 'start'">▶ Start</span>
+            <span x-show="busy && activeAction === 'start'" class="flex items-center gap-1"><span class="spinner"></span> Starting</span>
+          </button>
+          <button
+            class="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all duration-200 bg-red-600 hover:bg-red-500 text-white shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="busy || !serverStatus.running || serverStatus.stopping"
+            @click="confirmAction('stop', 'Stop the server? Active players will be disconnected.')">
+            <span x-show="!busy || activeAction !== 'stop'">■ Stop</span>
+            <span x-show="busy && activeAction === 'stop'" class="flex items-center gap-1"><span class="spinner"></span> Stopping</span>
+          </button>
+          <button
+            class="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all duration-200 bg-amber-600 hover:bg-amber-500 text-white shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="busy || !serverStatus.running || serverStatus.stopping"
+            @click="confirmAction('restart', 'Restart the server? Active players will be disconnected.')">
+            <span x-show="!busy || activeAction !== 'restart'">↺ Restart</span>
+            <span x-show="busy && activeAction === 'restart'" class="flex items-center gap-1"><span class="spinner"></span> Restarting</span>
+          </button>
+          <button
+            class="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all duration-200 bg-blue-600 hover:bg-blue-500 text-white shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="busy || serverStatus.running || serverStatus.stopping"
+            @click="confirmAction('install', 'Download/update the server files?')">
+            <span x-show="!busy || activeAction !== 'install'">⬇ Install / Update</span>
+            <span x-show="busy && activeAction === 'install'" class="flex items-center gap-1"><span class="spinner"></span> Installing</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Main two-column layout -->
+  <!-- ═══ Main Grid ═══ -->
   <main class="p-4 grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 max-w-screen-2xl mx-auto">
 
-    <!-- LEFT: Server Configuration -->
-    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden" x-data="serverConfigPanel()">
-      <div class="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
-        <span class="text-gray-300 font-semibold text-sm">🖥 Server Configuration</span>
+    <!-- ── Server Configuration ── -->
+    <section class="card" x-data="serverConfigPanel()">
+      <div class="card-header card-header-green">
+        <span class="text-gray-200 font-semibold text-sm">Server Configuration</span>
+        <span class="ml-auto text-xs text-gray-500">Changes apply on next start</span>
       </div>
-      <div class="p-4 space-y-3 overflow-y-auto" style="max-height: calc(100vh - 280px)">
-        <div class="text-xs text-yellow-400 bg-yellow-900/30 border border-yellow-700 rounded px-3 py-2">
-          Changes take effect on next server start.
-        </div>
+      <div class="p-4 space-y-3 overflow-y-auto scroll-thin" style="max-height: calc(100vh - 300px)">
 
         <!-- Map -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">MAP_NAME</label>
+          <label class="text-xs text-gray-400">Map</label>
           <select x-model="config.MAP_NAME"
-            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500">
+            class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100">
             <template x-for="map in knownMaps" :key="map">
               <option :value="map" x-text="map"></option>
             </template>
@@ -128,117 +141,105 @@
 
         <!-- Session Name -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">SESSION_NAME</label>
+          <label class="text-xs text-gray-400">Session Name</label>
           <input type="text" x-model="config.SESSION_NAME"
-            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+            class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
         </div>
 
         <!-- Max Players -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">MAX_PLAYERS</label>
+          <label class="text-xs text-gray-400">Max Players</label>
           <input type="number" x-model="config.MAX_PLAYERS" min="1" max="200"
-            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+            class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
         </div>
 
         <!-- Server Password -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">SERVER_PASSWORD</label>
+          <label class="text-xs text-gray-400">Server Password</label>
           <div class="flex gap-1">
-            <input :type="showPwd ? 'text' : 'password'" x-model="config.SERVER_PASSWORD"
-              placeholder="Leave blank for public"
-              class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono min-w-0">
+            <input :type="showPwd ? 'text' : 'password'" x-model="config.SERVER_PASSWORD" placeholder="Blank = public"
+              class="flex-1 bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono min-w-0">
             <button type="button" @click="showPwd = !showPwd"
-              class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 shrink-0">
-              <span x-text="showPwd ? '🙈' : '👁'"></span>
+              class="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 shrink-0 transition-colors">
+              <span x-text="showPwd ? 'Hide' : 'Show'"></span>
             </button>
           </div>
         </div>
 
         <!-- Admin Password -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">SERVER_ADMIN_PASSWORD</label>
+          <label class="text-xs text-gray-400">Admin Password</label>
           <div class="flex gap-1">
-            <input :type="showAdminPwd ? 'text' : 'password'" x-model="config.SERVER_ADMIN_PASSWORD"
-              placeholder="RCON / in-game admin"
-              class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono min-w-0">
+            <input :type="showAdminPwd ? 'text' : 'password'" x-model="config.SERVER_ADMIN_PASSWORD" placeholder="RCON / in-game admin"
+              class="flex-1 bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono min-w-0">
             <button type="button" @click="showAdminPwd = !showAdminPwd"
-              class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 shrink-0">
-              <span x-text="showAdminPwd ? '🙈' : '👁'"></span>
+              class="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 shrink-0 transition-colors">
+              <span x-text="showAdminPwd ? 'Hide' : 'Show'"></span>
             </button>
           </div>
         </div>
 
         <!-- Separator: Networking -->
-        <div class="border-t border-gray-700 pt-2 mt-2">
-          <span class="text-xs text-gray-500 uppercase tracking-wider">Networking</span>
-        </div>
+        <div class="ini-category">Networking</div>
 
-        <!-- Game Port -->
+        <!-- Ports -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">ASA_PORT</label>
+          <label class="text-xs text-gray-400">Game Port</label>
           <input type="number" x-model="config.ASA_PORT" min="1024" max="65535"
-            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+            class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
         </div>
-
-        <!-- Query Port -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">QUERY_PORT</label>
+          <label class="text-xs text-gray-400">Query Port</label>
           <input type="number" x-model="config.QUERY_PORT" min="1024" max="65535"
-            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+            class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
         </div>
-
-        <!-- RCON Port -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">RCON_PORT</label>
+          <label class="text-xs text-gray-400">RCON Port</label>
           <input type="number" x-model="config.RCON_PORT" min="1024" max="65535"
-            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+            class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
         </div>
 
-        <!-- RCON Enabled -->
+        <!-- RCON Toggle -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">RCON_ENABLED</label>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" x-model="rconEnabled"
-              class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900">
-            <span class="text-xs text-gray-400" x-text="rconEnabled ? 'Enabled' : 'Disabled'"></span>
+          <label class="text-xs text-gray-400">RCON</label>
+          <label class="toggle">
+            <input type="checkbox" x-model="rconEnabled">
+            <span class="toggle-slider"></span>
           </label>
         </div>
 
         <!-- Steam Server Token -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">STEAM_SERVER_TOKEN</label>
-          <input type="text" x-model="config.STEAM_SERVER_TOKEN" placeholder="GSLT from steamcommunity.com/dev/managegameservers"
-            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+          <label class="text-xs text-gray-400">Steam Token</label>
+          <input type="text" x-model="config.STEAM_SERVER_TOKEN" placeholder="GSLT from Steam"
+            class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
         </div>
 
         <!-- Separator: Gameplay -->
-        <div class="border-t border-gray-700 pt-2 mt-2">
-          <span class="text-xs text-gray-500 uppercase tracking-wider">Gameplay</span>
-        </div>
+        <div class="ini-category">Gameplay</div>
 
         <!-- BattlEye -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">BATTLEYE</label>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" x-model="battleye"
-              class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900">
-            <span class="text-xs text-gray-400" x-text="battleye ? 'Enabled' : 'Disabled'"></span>
+          <label class="text-xs text-gray-400">BattlEye</label>
+          <label class="toggle">
+            <input type="checkbox" x-model="battleye">
+            <span class="toggle-slider"></span>
           </label>
         </div>
 
         <!-- Custom Args -->
         <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
-          <label class="text-xs text-gray-400 font-mono">CUSTOM_SERVER_ARGS</label>
+          <label class="text-xs text-gray-400">Custom Args</label>
           <input type="text" x-model="config.CUSTOM_SERVER_ARGS" placeholder="Extra launch flags"
-            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+            class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
         </div>
 
-        <!-- Save button -->
-        <div class="flex items-center gap-3 pt-1">
+        <!-- Save -->
+        <div class="flex items-center gap-3 pt-2">
           <button @click="saveConfig()" :disabled="saving"
-            class="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center gap-2">
+            class="bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm">
             <span x-show="!saving">Save Configuration</span>
-            <span x-show="saving" class="flex items-center gap-1"><span class="spinner"></span> Saving…</span>
+            <span x-show="saving" class="flex items-center gap-1"><span class="spinner"></span> Saving</span>
           </button>
           <span x-show="saveMsg" x-text="saveMsg"
             :class="saveMsgOk ? 'text-green-400' : 'text-red-400'"
@@ -247,93 +248,127 @@
       </div>
     </section>
 
-    <!-- LEFT: INI Settings Panel -->
-    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden lg:col-start-1" x-data="settingsPanel()">
-      <div class="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
-        <span class="text-gray-300 font-semibold text-sm">⚙ Settings</span>
+    <!-- ── Log Viewer ── -->
+    <section class="card flex flex-col lg:row-span-2" x-data="logViewer()">
+      <div class="card-header card-header-blue justify-between">
+        <span class="text-gray-200 font-semibold text-sm">Server Logs</span>
+        <div class="flex items-center gap-3">
+          <input type="text" x-model="searchFilter" placeholder="Filter..."
+            class="w-28 bg-gray-800/50 border border-gray-600/50 rounded px-2 py-1 text-xs text-gray-300 placeholder-gray-600">
+          <label class="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+            <input type="checkbox" x-model="autoScroll" class="w-3.5 h-3.5 rounded">
+            Auto-scroll
+          </label>
+          <span class="text-xs text-gray-500" x-text="lines.length + ' lines'"></span>
+          <button @click="clearLogs()"
+            class="text-xs px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-gray-200 transition-colors">
+            Clear
+          </button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto p-3 font-mono text-xs log-panel bg-terminal"
+           x-ref="logContainer"
+           style="max-height: calc(100vh - 300px); min-height: 300px;">
+        <template x-for="entry in filteredEntries" :key="entry.id">
+          <div class="log-line leading-5 whitespace-pre-wrap break-all"
+               :class="lineClass(entry.text)"
+               x-text="entry.text"></div>
+        </template>
+        <div x-show="lines.length === 0" class="text-gray-600 italic">Waiting for logs...</div>
+      </div>
+    </section>
+
+    <!-- ── INI Settings ── -->
+    <section class="card lg:col-start-1" x-data="settingsPanel()">
+      <div class="card-header card-header-amber justify-between">
+        <div class="flex items-center gap-3">
+          <span class="text-gray-200 font-semibold text-sm">INI Settings</span>
+          <span x-show="activeSection && settingsData[activeSection]"
+                class="badge bg-gray-700/50 text-gray-400"
+                x-text="getVisibleSettings(activeSection).length + ' of ' + (settingsData[activeSection]?.length || 0)"></span>
+        </div>
+        <div class="seg-control">
+          <button class="seg-btn" :class="!showAdvanced && 'active'" @click="showAdvanced = false">Common</button>
+          <button class="seg-btn" :class="showAdvanced && 'active'" @click="showAdvanced = true">All</button>
+        </div>
       </div>
 
       <!-- Section tabs -->
-      <div class="flex flex-wrap gap-1 px-4 pt-3 border-b border-gray-700 pb-0">
+      <div class="flex flex-wrap gap-1 px-4 pt-3 border-b border-gray-700/50 pb-0">
         <template x-for="section in sections" :key="section">
           <button
             class="px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 transition-colors -mb-px"
             :class="activeSection === section
-              ? 'border-green-500 text-green-400 bg-gray-800'
-              : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'"
+              ? 'border-amber-500 text-amber-400 bg-gray-800/50'
+              : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'"
             @click="activeSection = section">
             <span x-text="section"></span>
           </button>
         </template>
-        <div x-show="sections.length === 0" class="text-xs text-gray-500 py-2">Loading…</div>
+        <div x-show="sections.length === 0" class="text-xs text-gray-500 py-2">Loading...</div>
       </div>
 
       <!-- Settings form -->
-      <div class="p-4 overflow-y-auto max-h-[calc(100vh-280px)]">
+      <div class="p-4 overflow-y-auto scroll-thin max-h-[calc(100vh-300px)]">
         <template x-if="activeSection && settingsData[activeSection]">
           <div>
             <form @submit.prevent="saveSection(activeSection)">
-              <div class="space-y-3">
-                <template x-for="(pair, idx) in settingsData[activeSection]" :key="idx">
+              <div class="space-y-2">
+                <template x-for="(item, idx) in getVisibleSettings(activeSection)" :key="item._idx">
+
+                  <!-- Category divider (common mode only) -->
+                  <template x-if="!showAdvanced && item._category && item._isFirstInCategory">
+                    <div class="ini-category" x-text="item._category"></div>
+                  </template>
+
                   <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-start">
                     <label class="text-xs text-gray-400 pt-2 break-all cursor-help"
-                      :class="INI_LABELS[pair.key] ? '' : 'font-mono'"
-                      :title="pair.key"
-                      x-text="INI_LABELS[pair.key] || pair.key"></label>
-                    <div class="relative">
+                      :class="INI_LABELS[item.pair.key] ? '' : 'font-mono'"
+                      :title="item.pair.key"
+                      x-text="INI_LABELS[item.pair.key] || item.pair.key"></label>
+                    <div>
 
                       <!-- Password field -->
-                      <template x-if="pair.key.toLowerCase().includes('password')">
+                      <template x-if="item.pair.key.toLowerCase().includes('password')">
                         <div class="flex gap-1">
                           <input
-                            :type="showPassword[pair.key] ? 'text' : 'password'"
-                            :value="getEdited(activeSection, idx, pair.value)"
-                            @input="updateSetting(activeSection, idx, $event.target.value)"
-                            class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono min-w-0">
+                            :type="showPassword[item.pair.key] ? 'text' : 'password'"
+                            :value="getEdited(activeSection, item._idx, item.pair.value)"
+                            @input="updateSetting(activeSection, item._idx, $event.target.value)"
+                            class="flex-1 bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono min-w-0">
                           <button type="button"
-                            @click="showPassword[pair.key] = !showPassword[pair.key]"
-                            class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300 shrink-0">
-                            <span x-text="showPassword[pair.key] ? '🙈' : '👁'"></span>
+                            @click="showPassword[item.pair.key] = !showPassword[item.pair.key]"
+                            class="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 shrink-0 transition-colors">
+                            <span x-text="showPassword[item.pair.key] ? 'Hide' : 'Show'"></span>
                           </button>
                         </div>
                       </template>
 
-                      <!-- Boolean checkbox -->
-                      <template x-if="!pair.key.toLowerCase().includes('password') && isBool(pair.value)">
-                        <label class="flex items-center gap-2 cursor-pointer pt-1">
+                      <!-- Boolean toggle -->
+                      <template x-if="!item.pair.key.toLowerCase().includes('password') && isBool(item.pair.value)">
+                        <label class="toggle mt-1">
                           <input type="checkbox"
-                            :checked="parseBool(getEdited(activeSection, idx, pair.value))"
-                            @change="updateSetting(activeSection, idx, $event.target.checked ? 'True' : 'False')"
-                            class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-green-500 focus:ring-green-500 focus:ring-offset-gray-900">
+                            :checked="parseBool(getEdited(activeSection, item._idx, item.pair.value))"
+                            @change="updateSetting(activeSection, item._idx, $event.target.checked ? 'True' : 'False')">
+                          <span class="toggle-slider"></span>
                         </label>
                       </template>
 
-                      <!-- Map name select -->
-                      <template x-if="!pair.key.toLowerCase().includes('password') && !isBool(pair.value) && pair.key === 'MAP_NAME'">
-                        <select
-                          :value="getEdited(activeSection, idx, pair.value)"
-                          @change="updateSetting(activeSection, idx, $event.target.value)"
-                          class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500">
-                          <template x-for="map in knownMaps" :key="map">
-                            <option :value="map" :selected="getEdited(activeSection, idx, pair.value) === map" x-text="map"></option>
-                          </template>
-                        </select>
-                      </template>
-
                       <!-- Number input -->
-                      <template x-if="!pair.key.toLowerCase().includes('password') && !isBool(pair.value) && pair.key !== 'MAP_NAME' && isNumber(pair.key, pair.value)">
+                      <template x-if="!item.pair.key.toLowerCase().includes('password') && !isBool(item.pair.value) && isNumber(item.pair.key, item.pair.value)">
                         <input type="number"
-                          :value="getEdited(activeSection, idx, pair.value)"
-                          @input="updateSetting(activeSection, idx, $event.target.value)"
-                          class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+                          :step="isMultiplier(item.pair.key) ? '0.1' : '1'"
+                          :value="getEdited(activeSection, item._idx, item.pair.value)"
+                          @input="updateSetting(activeSection, item._idx, $event.target.value)"
+                          class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
                       </template>
 
                       <!-- Default text input -->
-                      <template x-if="!pair.key.toLowerCase().includes('password') && !isBool(pair.value) && pair.key !== 'MAP_NAME' && !isNumber(pair.key, pair.value)">
+                      <template x-if="!item.pair.key.toLowerCase().includes('password') && !isBool(item.pair.value) && !isNumber(item.pair.key, item.pair.value)">
                         <input type="text"
-                          :value="getEdited(activeSection, idx, pair.value)"
-                          @input="updateSetting(activeSection, idx, $event.target.value)"
-                          class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+                          :value="getEdited(activeSection, item._idx, item.pair.value)"
+                          @input="updateSetting(activeSection, item._idx, $event.target.value)"
+                          class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
                       </template>
 
                     </div>
@@ -344,15 +379,15 @@
               <div class="mt-4 flex items-center gap-3">
                 <button type="submit"
                   :disabled="savingSection"
-                  class="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-medium transition-colors flex items-center gap-2">
+                  class="bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 shadow-sm">
                   <span x-show="!savingSection">Save <span x-text="activeSection"></span></span>
-                  <span x-show="savingSection" class="flex items-center gap-1"><span class="spinner"></span> Saving…</span>
+                  <span x-show="savingSection" class="flex items-center gap-1"><span class="spinner"></span> Saving</span>
                 </button>
                 <span x-show="saveMsg" x-text="saveMsg"
                   :class="saveMsgOk ? 'text-green-400' : 'text-red-400'"
-                  class="text-xs transition-opacity"></span>
+                  class="text-xs"></span>
               </div>
-              <p class="mt-2 text-xs text-gray-500">Changes take effect after a server restart.</p>
+              <p class="mt-2 text-xs text-gray-600">Changes take effect after a server restart.</p>
             </form>
           </div>
         </template>
@@ -360,128 +395,94 @@
       </div>
     </section>
 
-    <!-- RIGHT: Log Viewer (spans both rows) -->
-    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden flex flex-col lg:row-span-2" x-data="logViewer()">
-      <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between shrink-0">
-        <span class="text-gray-300 font-semibold text-sm">📋 Server Logs</span>
-        <div class="flex items-center gap-3">
-          <label class="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
-            <input type="checkbox" x-model="autoScroll" class="w-3.5 h-3.5 rounded">
-            Auto-scroll
-          </label>
-          <span class="text-xs text-gray-500" x-text="lines.length + ' lines'"></span>
-          <button @click="clearLogs()"
-            class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-gray-300 transition-colors">
-            Clear
-          </button>
-        </div>
-      </div>
-      <div class="flex-1 overflow-y-auto p-3 font-mono text-xs log-panel bg-terminal"
-           x-ref="logContainer"
-           style="max-height: calc(100vh - 280px); min-height: 300px;">
-        <template x-for="entry in logEntries" :key="entry.id">
-          <div class="log-line leading-5 whitespace-pre-wrap break-all"
-               :class="lineClass(entry.text)"
-               x-text="entry.text"></div>
-        </template>
-        <div x-show="lines.length === 0" class="text-gray-600">Waiting for logs…</div>
-      </div>
-    </section>
-
   </main>
 
-  <!-- Management panels -->
+  <!-- ═══ Management Panels ═══ -->
   <div class="px-4 pb-4 grid grid-cols-1 lg:grid-cols-3 gap-4 max-w-screen-2xl mx-auto">
 
-    <!-- Mod Management -->
-    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden" x-data="modPanel()">
-      <div class="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
-        <span class="text-gray-300 font-semibold text-sm">Mod Management</span>
+    <!-- ── Mods ── -->
+    <section class="card" x-data="modPanel()">
+      <div class="card-header card-header-purple justify-between">
+        <span class="text-gray-200 font-semibold text-sm">Mods</span>
+        <span x-show="mods.length > 0" class="badge bg-purple-900/50 text-purple-300" x-text="mods.length"></span>
       </div>
       <div class="p-4 space-y-3">
-        <div class="text-xs text-yellow-400 bg-yellow-900/30 border border-yellow-700 rounded px-3 py-2">
-          Server restart required for mod changes to take effect.
-        </div>
         <div class="flex gap-2">
-          <input type="text" x-model="newModId" placeholder="Mod ID (numeric)"
+          <input type="text" x-model="newModId" placeholder="Mod ID"
             @keydown.enter="addMod()"
-            class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+            class="flex-1 bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
           <button @click="addMod()" :disabled="!newModId.trim()"
-            class="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
-            Add Mod
+            class="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg text-xs font-medium transition-all">
+            Add
           </button>
         </div>
-        <div x-show="mods.length === 0" class="text-xs text-gray-500">No mods configured.</div>
-        <ul class="space-y-1">
+        <div x-show="mods.length === 0" class="text-xs text-gray-600">No mods installed.</div>
+        <div class="flex flex-wrap gap-2">
           <template x-for="mod in mods" :key="mod">
-            <li class="flex items-center justify-between bg-gray-800 rounded px-3 py-1.5">
-              <span class="text-xs font-mono text-gray-200" x-text="mod"></span>
-              <button @click="removeMod(mod)"
-                class="text-xs text-red-400 hover:text-red-300 transition-colors">Remove</button>
-            </li>
+            <div class="mod-pill">
+              <span x-text="mod"></span>
+              <button @click="removeMod(mod)" title="Remove">&times;</button>
+            </div>
           </template>
-        </ul>
+        </div>
+        <div x-show="mods.length > 0" class="text-xs text-gray-600">Restart required for mod changes.</div>
       </div>
     </section>
 
-    <!-- Scheduled Restarts -->
-    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden" x-data="schedulePanel()">
-      <div class="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
-        <span class="text-gray-300 font-semibold text-sm">Scheduled Restarts</span>
+    <!-- ── Auto Restart ── -->
+    <section class="card" x-data="schedulePanel()">
+      <div class="card-header card-header-amber justify-between">
+        <span class="text-gray-200 font-semibold text-sm">Auto Restart</span>
+        <span x-show="interval !== '0'" class="badge bg-amber-900/50 text-amber-300"
+              x-text="'Every ' + interval + 'h'"></span>
       </div>
       <div class="p-4 space-y-3">
-        <div class="text-xs text-gray-400">Times are in container local time (24-hour format).</div>
-        <div class="flex gap-2">
-          <input type="time" x-model="newTime"
-            class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
-          <button @click="addTime()" :disabled="!newTime"
-            class="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
-            Add Time
-          </button>
-        </div>
-        <div x-show="times.length === 0" class="text-xs text-gray-500">No scheduled restarts.</div>
-        <ul class="space-y-1">
-          <template x-for="(t, i) in times" :key="i">
-            <li class="flex items-center justify-between bg-gray-800 rounded px-3 py-1.5">
-              <span class="text-xs font-mono text-gray-200" x-text="t"></span>
-              <button @click="removeTime(i)"
-                class="text-xs text-red-400 hover:text-red-300 transition-colors">Remove</button>
-            </li>
-          </template>
-        </ul>
-        <div class="flex gap-2" x-show="dirty">
-          <button @click="saveSchedule()" :disabled="saving"
-            class="bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
-            <span x-show="!saving">Save Schedule</span>
-            <span x-show="saving">Saving...</span>
+        <div class="text-xs text-gray-500">Prevent memory buildup and hangs with scheduled restarts.</div>
+        <div class="flex gap-2 items-center">
+          <select x-model="interval" @change="dirty = (interval !== _original)"
+            class="flex-1 bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100">
+            <option value="0">Disabled</option>
+            <option value="3">Every 3 hours</option>
+            <option value="6">Every 6 hours</option>
+            <option value="12">Every 12 hours</option>
+            <option value="18">Every 18 hours</option>
+            <option value="24">Every 24 hours</option>
+          </select>
+          <button @click="saveSchedule()" :disabled="saving || !dirty"
+            class="bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg text-xs font-medium transition-all">
+            <span x-show="!saving">Save</span>
+            <span x-show="saving">Saving</span>
           </button>
         </div>
       </div>
     </section>
 
-    <!-- Backup / Restore -->
-    <section class="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden" x-data="backupPanel()">
-      <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-        <span class="text-gray-300 font-semibold text-sm">Backups</span>
+    <!-- ── Backups ── -->
+    <section class="card" x-data="backupPanel()">
+      <div class="card-header card-header-teal justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-gray-200 font-semibold text-sm">Backups</span>
+          <span x-show="backups.length > 0" class="badge bg-teal-900/50 text-teal-300" x-text="backups.length"></span>
+        </div>
         <button @click="createBackup()" :disabled="creating"
-          class="bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
+          class="bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
           <span x-show="!creating">Create Backup</span>
-          <span x-show="creating">Creating...</span>
+          <span x-show="creating" class="flex items-center gap-1"><span class="spinner"></span> Creating</span>
         </button>
       </div>
-      <div class="p-4 space-y-2 overflow-y-auto" style="max-height: 300px;">
-        <div x-show="backups.length === 0" class="text-xs text-gray-500">No backups found.</div>
+      <div class="p-4 space-y-2 overflow-y-auto scroll-thin" style="max-height: 300px;">
+        <div x-show="backups.length === 0" class="text-xs text-gray-600">No backups found.</div>
         <template x-for="b in backups" :key="b.filename">
-          <div class="flex items-center justify-between bg-gray-800 rounded px-3 py-2">
+          <div class="flex items-center justify-between bg-gray-800/30 rounded-lg px-3 py-2.5 border border-gray-700/30">
             <div>
               <div class="text-xs font-mono text-gray-200" x-text="b.filename"></div>
               <div class="text-xs text-gray-500" x-text="formatSize(b.size) + ' — ' + formatDate(b.created)"></div>
             </div>
             <div class="flex gap-2 shrink-0">
               <button @click="restoreBackup(b.filename)"
-                class="text-xs text-yellow-400 hover:text-yellow-300 transition-colors">Restore</button>
+                class="text-xs text-amber-400 hover:text-amber-300 transition-colors font-medium">Restore</button>
               <button @click="deleteBackup(b.filename)"
-                class="text-xs text-red-400 hover:text-red-300 transition-colors">Delete</button>
+                class="text-xs text-red-400 hover:text-red-300 transition-colors font-medium">Delete</button>
             </div>
           </div>
         </template>
@@ -491,35 +492,33 @@
   </div>
 
   <script>
-    // ── Shared constants
+    // ── Shared constants ──────────────────────────────────
     const KNOWN_MAPS = [
       'TheIsland_WP', 'ScorchedEarth_WP', 'Aberration_WP', 'Extinction_WP',
       'Ragnarok_WP', 'TheCenter_WP', 'Valguero_WP', 'CrystalIsles_WP',
       'LostIsland_WP', 'Fjordur_WP', 'Genesis_WP', 'Genesis2_WP',
     ];
 
-    // Human-readable labels for common ARK INI settings (raw key → friendly name)
     const INI_LABELS = {
-      // ServerSettings
       'AllowHideDamageSourceFromLogs': 'Hide Damage Source in Logs',
       'AllowThirdPersonPlayer': 'Allow Third-Person View',
       'AlwaysNotifyPlayerJoined': 'Notify on Player Join',
       'AlwaysNotifyPlayerLeft': 'Notify on Player Leave',
       'AutoSavePeriodMinutes': 'Auto-Save Interval (min)',
-      'DayCycleSpeedScale': 'Day Speed Multiplier',
-      'NightTimeSpeedScale': 'Night Speed Multiplier',
-      'DayTimeSpeedScale': 'Day Time Speed',
+      'DayCycleSpeedScale': 'Day Cycle Speed',
+      'NightTimeSpeedScale': 'Nighttime Speed',
+      'DayTimeSpeedScale': 'Daytime Speed',
       'DifficultyOffset': 'Difficulty Offset',
-      'DinoCharacterFoodDrainMultiplier': 'Dino Food Drain Rate',
-      'DinoCharacterHealthRecoveryMultiplier': 'Dino Health Recovery Rate',
-      'DinoCharacterStaminaDrainMultiplier': 'Dino Stamina Drain Rate',
-      'DinoDamageMultiplier': 'Dino Damage Multiplier',
-      'DinoResistanceMultiplier': 'Dino Resistance Multiplier',
-      'DinoCountMultiplier': 'Dino Spawn Count Multiplier',
+      'DinoCharacterFoodDrainMultiplier': 'Dino Food Drain',
+      'DinoCharacterHealthRecoveryMultiplier': 'Dino Health Recovery',
+      'DinoCharacterStaminaDrainMultiplier': 'Dino Stamina Drain',
+      'DinoDamageMultiplier': 'Dino Damage',
+      'DinoResistanceMultiplier': 'Dino Resistance',
+      'DinoCountMultiplier': 'Dino Spawn Count',
       'DisableStructureDecayPvE': 'Disable Structure Decay (PvE)',
       'GlobalVoiceChat': 'Global Voice Chat',
-      'HarvestAmountMultiplier': 'Harvest Amount Multiplier',
-      'HarvestHealthMultiplier': 'Harvest Health Multiplier',
+      'HarvestAmountMultiplier': 'Harvest Amount',
+      'HarvestHealthMultiplier': 'Harvest Health',
       'MaxPersonalTamedDinos': 'Max Personal Tamed Dinos',
       'MaxPlatformSaddleStructureLimit': 'Platform Saddle Structure Limit',
       'MaxStructuresInRange': 'Max Structures in Range',
@@ -527,21 +526,21 @@
       'NoTributeDownloads': 'Disable Tribute Downloads',
       'OverrideOfficialDifficulty': 'Override Official Difficulty',
       'OverrideStructurePlatformPrevention': 'Override Platform Build Prevention',
-      'OxygenSwimSpeedStatMultiplier': 'Oxygen Swim Speed Multiplier',
-      'PerPlatformMaxStructuresMultiplier': 'Platform Max Structures Multiplier',
+      'OxygenSwimSpeedStatMultiplier': 'Oxygen Swim Speed',
+      'PerPlatformMaxStructuresMultiplier': 'Platform Max Structures',
       'PvEStructureDecayDestructionPeriod': 'PvE Decay Destruction Period',
-      'PvEStructureDecayPeriodMultiplier': 'PvE Decay Period Multiplier',
-      'PlayerCharacterFoodDrainMultiplier': 'Player Food Drain Rate',
-      'PlayerCharacterHealthRecoveryMultiplier': 'Player Health Recovery Rate',
-      'PlayerCharacterStaminaDrainMultiplier': 'Player Stamina Drain Rate',
-      'PlayerCharacterWaterDrainMultiplier': 'Player Water Drain Rate',
-      'PlayerDamageMultiplier': 'Player Damage Multiplier',
-      'PlayerResistanceMultiplier': 'Player Resistance Multiplier',
+      'PvEStructureDecayPeriodMultiplier': 'PvE Decay Period',
+      'PlayerCharacterFoodDrainMultiplier': 'Player Food Drain',
+      'PlayerCharacterHealthRecoveryMultiplier': 'Player Health Recovery',
+      'PlayerCharacterStaminaDrainMultiplier': 'Player Stamina Drain',
+      'PlayerCharacterWaterDrainMultiplier': 'Player Water Drain',
+      'PlayerDamageMultiplier': 'Player Damage',
+      'PlayerResistanceMultiplier': 'Player Resistance',
       'ProximityChat': 'Proximity Chat',
       'RCONEnabled': 'RCON Enabled',
       'RCONPort': 'RCON Port',
       'RCONServerGameLogBuffer': 'RCON Log Buffer Size',
-      'ResourcesRespawnPeriodMultiplier': 'Resource Respawn Period',
+      'ResourcesRespawnPeriodMultiplier': 'Resource Respawn Rate',
       'ServerAdminPassword': 'Admin Password',
       'ServerCrosshair': 'Show Crosshair',
       'ServerForceNoHUD': 'Force No HUD',
@@ -549,9 +548,9 @@
       'ServerPassword': 'Server Password',
       'ServerPVE': 'PvE Mode',
       'ShowMapPlayerLocation': 'Show Player on Map',
-      'StructureDamageMultiplier': 'Structure Damage Multiplier',
-      'StructureResistanceMultiplier': 'Structure Resistance Multiplier',
-      'TamingSpeedMultiplier': 'Taming Speed Multiplier',
+      'StructureDamageMultiplier': 'Structure Damage',
+      'StructureResistanceMultiplier': 'Structure Resistance',
+      'TamingSpeedMultiplier': 'Taming Speed',
       'XPMultiplier': 'XP Multiplier',
       'EnablePvPGamma': 'Enable PvP Gamma',
       'EnablePvEGamma': 'Enable PvE Gamma',
@@ -559,7 +558,7 @@
       'ActiveMods': 'Active Mods',
       'MaxPlayers': 'Max Players',
       'KickIdlePlayersPeriod': 'Kick Idle Players After (sec)',
-      'AutoDestroyOldStructuresMultiplier': 'Auto-Destroy Old Structures Rate',
+      'AutoDestroyOldStructuresMultiplier': 'Auto-Destroy Old Structures',
       'UseOptimizedHarvestingHealth': 'Optimized Harvest Health',
       'ClampResourceHarvestDamage': 'Clamp Harvest Damage',
       'PvPStructureDecay': 'PvP Structure Decay',
@@ -567,15 +566,15 @@
       'bAllowPlatformSaddleMultiFloors': 'Allow Platform Multi-Floors',
       'PreventOfflinePvP': 'Prevent Offline PvP',
       'PreventOfflinePvPInterval': 'Offline PvP Protection Delay (sec)',
-      'bPassiveDefensesDamageRiderlessDinos': 'Passive Defenses Damage Riderless Dinos',
+      'bPassiveDefensesDamageRiderlessDinos': 'Passive Defenses Damage Riderless',
       'RaidDinoCharacterFoodDrainMultiplier': 'Raid Dino Food Drain',
-      'ItemStackSizeMultiplier': 'Item Stack Size Multiplier',
+      'ItemStackSizeMultiplier': 'Item Stack Size',
       'AllowRaidDinoFeeding': 'Allow Raid Dino Feeding',
       'EnableExtraStructurePreventionVolumes': 'Extra Structure Prevention Areas',
       'bFilterTribeNames': 'Filter Tribe Names',
       'bPvEDisableFriendlyFire': 'Disable Friendly Fire (PvE)',
       'DisablePvEGamma': 'Disable PvE Gamma',
-      'bDisableStructurePlacementCollision': 'Disable Structure Placement Collision',
+      'bDisableStructurePlacementCollision': 'Disable Placement Collision',
       'AllowCaveBuildingPvE': 'Allow Cave Building (PvE)',
       'AllowCaveBuildingPvP': 'Allow Cave Building (PvP)',
       'bUseCorpseLocator': 'Show Corpse Locator',
@@ -583,62 +582,86 @@
       'PreventDiseases': 'Prevent Diseases',
       'NonPermanentDiseases': 'Non-Permanent Diseases',
       'RandomSupplyCratePoints': 'Randomize Supply Drops',
-      'SupplyCrateLootQualityMultiplier': 'Supply Drop Quality Multiplier',
-      'FishingLootQualityMultiplier': 'Fishing Loot Quality Multiplier',
-      'CraftingSkillBonusMultiplier': 'Crafting Skill Bonus Multiplier',
+      'SupplyCrateLootQualityMultiplier': 'Supply Drop Quality',
+      'FishingLootQualityMultiplier': 'Fishing Loot Quality',
+      'CraftingSkillBonusMultiplier': 'Crafting Skill Bonus',
       'AllowMultipleAttachedC4': 'Allow Multiple C4',
       'CropGrowthSpeedMultiplier': 'Crop Growth Speed',
       'CropDecaySpeedMultiplier': 'Crop Decay Speed',
-      'LayEggIntervalMultiplier': 'Egg Lay Interval Multiplier',
-      'PoopIntervalMultiplier': 'Poop Interval Multiplier',
-      'MatingIntervalMultiplier': 'Mating Interval Multiplier',
+      'LayEggIntervalMultiplier': 'Egg Lay Interval',
+      'PoopIntervalMultiplier': 'Poop Interval',
+      'MatingIntervalMultiplier': 'Mating Interval',
       'EggHatchSpeedMultiplier': 'Egg Hatch Speed',
       'BabyMatureSpeedMultiplier': 'Baby Mature Speed',
-      'BabyFoodConsumptionSpeedMultiplier': 'Baby Food Consumption Rate',
+      'BabyFoodConsumptionSpeedMultiplier': 'Baby Food Consumption',
       'BabyCuddleIntervalMultiplier': 'Baby Cuddle Interval',
       'BabyCuddleGracePeriodMultiplier': 'Baby Cuddle Grace Period',
       'BabyCuddleLoseImprintQualitySpeedMultiplier': 'Imprint Quality Loss Speed',
       'BabyImprintingStatScaleMultiplier': 'Imprint Stat Scale',
-      'BabyImprintAmountMultiplier': 'Imprint Amount Multiplier',
+      'BabyImprintAmountMultiplier': 'Imprint Amount',
       'HairGrowthSpeedMultiplier': 'Hair Growth Speed',
       'CustomRecipeEffectivenessMultiplier': 'Custom Recipe Effectiveness',
-      'CustomRecipeSkillMultiplier': 'Custom Recipe Skill Multiplier',
-      'PlatformSaddleBuildAreaBoundsMultiplier': 'Platform Build Area Multiplier',
+      'CustomRecipeSkillMultiplier': 'Custom Recipe Skill',
+      'PlatformSaddleBuildAreaBoundsMultiplier': 'Platform Build Area',
       'StructurePickupTimeAfterPlacement': 'Structure Pickup Time (sec)',
       'StructurePickupHoldDuration': 'Structure Pickup Hold Time',
       'AllowIntegratedSPlusStructures': 'Allow S+ Structures',
-      'DayCycleSpeedScale': 'Day Cycle Speed',
-      'DayTimeSpeedScale': 'Daytime Speed',
-      'NightTimeSpeedScale': 'Nighttime Speed',
-      'ResourcesRespawnPeriodMultiplier': 'Resource Respawn Rate',
-      'HarvestHealthMultiplier': 'Harvest Health Multiplier',
-      'PlayerCharacterWaterDrainMultiplier': 'Player Water Drain',
-      'PlayerCharacterFoodDrainMultiplier': 'Player Food Drain',
-      'PlayerCharacterStaminaDrainMultiplier': 'Player Stamina Drain',
-      'PlayerCharacterHealthRecoveryMultiplier': 'Player Health Recovery',
-      'DinoCharacterFoodDrainMultiplier': 'Dino Food Drain',
-      'DinoCharacterStaminaDrainMultiplier': 'Dino Stamina Drain',
-      'DinoCharacterHealthRecoveryMultiplier': 'Dino Health Recovery',
-      'PlayerResistanceMultiplier': 'Player Resistance',
-      'DinoResistanceMultiplier': 'Dino Resistance',
-      'StructureDamageMultiplier': 'Structure Damage',
-      'StructureResistanceMultiplier': 'Structure Resistance',
       'WildDinoCharacterFoodDrainMultiplier': 'Wild Dino Food Drain',
       'WildDinoTorporDrainMultiplier': 'Wild Dino Torpor Drain',
       'PassiveTameIntervalMultiplier': 'Passive Tame Interval',
-      // SessionSettings
       'SessionName': 'Session Name',
       'QueryPort': 'Query Port',
       'Port': 'Game Port',
       'MultiHome': 'Bind IP Address',
-      // MessageOfTheDay
       'Message': 'Message of the Day',
       'Duration': 'MOTD Display Duration (sec)',
     };
 
+    // Common INI keys grouped by category (for filtered view)
+    const COMMON_INI_GROUPS = {
+      'Rates': [
+        'TamingSpeedMultiplier', 'XPMultiplier', 'HarvestAmountMultiplier', 'HarvestHealthMultiplier',
+        'DifficultyOffset', 'OverrideOfficialDifficulty',
+      ],
+      'Breeding': [
+        'MatingIntervalMultiplier', 'EggHatchSpeedMultiplier', 'BabyMatureSpeedMultiplier',
+        'BabyFoodConsumptionSpeedMultiplier', 'BabyCuddleIntervalMultiplier', 'BabyImprintAmountMultiplier',
+      ],
+      'Player': [
+        'PlayerDamageMultiplier', 'PlayerResistanceMultiplier',
+        'PlayerCharacterFoodDrainMultiplier', 'PlayerCharacterWaterDrainMultiplier',
+        'PlayerCharacterStaminaDrainMultiplier', 'PlayerCharacterHealthRecoveryMultiplier',
+      ],
+      'Dinos': [
+        'DinoDamageMultiplier', 'DinoResistanceMultiplier', 'DinoCharacterFoodDrainMultiplier',
+        'DinoCountMultiplier', 'MaxTamedDinos',
+      ],
+      'World': [
+        'DayCycleSpeedScale', 'DayTimeSpeedScale', 'NightTimeSpeedScale',
+        'ResourcesRespawnPeriodMultiplier',
+      ],
+      'Gameplay': [
+        'ServerPVE', 'AllowThirdPersonPlayer', 'ShowMapPlayerLocation',
+        'ServerHardcore', 'PreventOfflinePvP',
+      ],
+      'Structures': [
+        'StructureDamageMultiplier', 'StructureResistanceMultiplier', 'ItemStackSizeMultiplier',
+      ],
+    };
+
+    // Flat set for quick lookup
+    const COMMON_INI_KEYS = new Set(Object.values(COMMON_INI_GROUPS).flat());
+
+    // Map key → category
+    const KEY_TO_CATEGORY = {};
+    for (const [cat, keys] of Object.entries(COMMON_INI_GROUPS)) {
+      for (const k of keys) KEY_TO_CATEGORY[k] = cat;
+    }
+
     // ── Monotonic counter for toast IDs
     let _toastIdCounter = 0;
 
+    // ═══ App State ════════════════════════════════════════
     function appState() {
       return {
         busy: false,
@@ -647,31 +670,19 @@
         serverStatus: {},
         _statusInterval: null,
 
-        // Computed badge properties
-        get badgeClass() {
-          if (this.serverStatus.stopping) {
-            return 'bg-yellow-900 text-yellow-300 border border-yellow-700';
-          }
-          if (this.serverStatus.running) {
-            return 'bg-green-900 text-green-300 border border-green-700';
-          }
-          return 'bg-red-900 text-red-300 border border-red-700';
-        },
-
-        get dotClass() {
-          if (this.serverStatus.stopping) {
-            return 'bg-yellow-400 animate-pulse';
-          }
-          if (this.serverStatus.running) {
-            return 'bg-green-400 animate-pulse';
-          }
-          return 'bg-red-500';
-        },
-
         get badgeText() {
           if (this.serverStatus.stopping) return 'STOPPING';
           if (this.serverStatus.running) return 'RUNNING';
           return 'STOPPED';
+        },
+
+        get formattedUptime() {
+          const s = this.serverStatus.uptime_seconds || 0;
+          if (s < 60) return s + 's';
+          if (s < 3600) return Math.floor(s / 60) + 'm';
+          const h = Math.floor(s / 3600);
+          const m = Math.floor((s % 3600) / 60);
+          return h + 'h ' + m + 'm';
         },
 
         init() {
@@ -687,9 +698,7 @@
             if (res.ok) {
               this.serverStatus = await res.json();
             }
-          } catch(e) {
-            // Silently ignore polling errors
-          }
+          } catch(e) {}
         },
 
         async logout() {
@@ -698,9 +707,7 @@
         },
 
         confirmAction(action, message) {
-          if (confirm(message)) {
-            this.serverAction(action);
-          }
+          if (confirm(message)) this.serverAction(action);
         },
 
         async serverAction(action) {
@@ -720,7 +727,6 @@
           } finally {
             this.busy = false;
             this.activeAction = null;
-            // Trigger immediate status refresh
             this.pollStatus();
           }
         },
@@ -735,6 +741,7 @@
       };
     }
 
+    // ═══ Server Config Panel ══════════════════════════════
     function serverConfigPanel() {
       return {
         config: {
@@ -758,7 +765,6 @@
         saving: false,
         saveMsg: '',
         saveMsgOk: true,
-
         knownMaps: KNOWN_MAPS,
 
         async init() {
@@ -767,7 +773,6 @@
             if (res.status === 401) { window.location.reload(); return; }
             if (res.ok) {
               const data = await res.json();
-              // Merge loaded values over defaults
               Object.assign(this.config, data.config || {});
               this.battleye = this.config.BATTLEYE === 'True' || this.config.BATTLEYE === 'true';
               this.rconEnabled = this.config.RCON_ENABLED !== 'False' && this.config.RCON_ENABLED !== 'false';
@@ -778,7 +783,6 @@
         async saveConfig() {
           this.saving = true;
           this.saveMsg = '';
-          // Sync checkboxes to config
           this.config.BATTLEYE = this.battleye ? 'True' : 'False';
           this.config.RCON_ENABLED = this.rconEnabled ? 'True' : 'False';
           try {
@@ -809,6 +813,7 @@
       };
     }
 
+    // ═══ Settings Panel (INI Editor) ══════════════════════
     function settingsPanel() {
       return {
         sections: [],
@@ -819,7 +824,7 @@
         saveMsg: '',
         saveMsgOk: true,
         showPassword: {},
-
+        showAdvanced: false,
         knownMaps: KNOWN_MAPS,
 
         async init() {
@@ -833,13 +838,31 @@
             if (this.sections.length > 0) {
               this.activeSection = this.sections[0];
             }
-            // Deep copy for editing (array of {key, value} pairs per section)
             for (const s of this.sections) {
               this.editedSettings[s] = data[s].map(p => ({...p}));
             }
           } catch(e) {
             console.error('Failed to load settings', e);
           }
+        },
+
+        getVisibleSettings(section) {
+          if (!section || !this.settingsData[section]) return [];
+          const pairs = this.settingsData[section];
+          if (this.showAdvanced) {
+            return pairs.map((pair, idx) => ({ pair, _idx: idx }));
+          }
+          // Common mode: filter + group
+          let lastCategory = null;
+          return pairs
+            .map((pair, idx) => ({ pair, _idx: idx }))
+            .filter(item => COMMON_INI_KEYS.has(item.pair.key))
+            .map(item => {
+              const cat = KEY_TO_CATEGORY[item.pair.key] || null;
+              const isFirst = cat !== lastCategory;
+              lastCategory = cat;
+              return { ...item, _category: cat, _isFirstInCategory: isFirst };
+            });
         },
 
         getEdited(section, idx, fallback) {
@@ -860,6 +883,7 @@
           this.savingSection = true;
           this.saveMsg = '';
           try {
+            // Always save ALL settings, not just visible ones
             const payload = this.editedSettings[section] || this.settingsData[section];
             const res = await fetch('/api/settings', {
               method: 'POST',
@@ -871,7 +895,6 @@
             if (res.ok) {
               this.saveMsg = '✓ Saved';
               this.saveMsgOk = true;
-              // Sync back
               this.settingsData[section] = payload.map(p => ({...p}));
             } else {
               this.saveMsg = '✗ ' + (data.detail || 'Save failed');
@@ -901,26 +924,40 @@
           const numKeys = ['MaxPlayers', 'Port', 'QueryPort', 'RCONPort', 'MaxStructuresInRange',
                            'ServerPort', 'UDPPort', 'Slots', 'MaxTributes'];
           if (numKeys.some(k => key.includes(k))) return true;
+          if (key.toLowerCase().includes('multiplier') || key.toLowerCase().includes('scale') ||
+              key.toLowerCase().includes('speed') || key.toLowerCase().includes('offset') ||
+              key.toLowerCase().includes('interval') || key.toLowerCase().includes('period')) return true;
           if (typeof val === 'number') return true;
-          if (typeof val === 'string' && /^\d+$/.test(String(val))) return true;
+          if (typeof val === 'string' && /^\d+(\.\d+)?$/.test(String(val).trim())) return true;
           return false;
+        },
+
+        isMultiplier(key) {
+          const k = key.toLowerCase();
+          return k.includes('multiplier') || k.includes('scale') || k.includes('speed') || k.includes('offset');
         }
       };
     }
 
+    // ═══ Log Viewer ═══════════════════════════════════════
     function logViewer() {
-      // Monotonic counter for log line keys
       let _logLineId = 0;
 
       return {
         lines: [],
         logEntries: [],
         autoScroll: true,
+        searchFilter: '',
         MAX_LINES: 500,
         es: null,
 
+        get filteredEntries() {
+          if (!this.searchFilter) return this.logEntries;
+          const q = this.searchFilter.toLowerCase();
+          return this.logEntries.filter(e => e.text.toLowerCase().includes(q));
+        },
+
         async init() {
-          // Load recent logs
           try {
             const res = await fetch('/api/logs/recent?n=100');
             if (res.status === 401) { window.location.href = '/login'; return; }
@@ -933,8 +970,6 @@
           } catch(e) {
             console.error('Failed to load recent logs', e);
           }
-
-          // SSE stream
           this.startStream();
         },
 
@@ -949,7 +984,6 @@
             if (this._reconnecting) return;
             this._reconnecting = true;
             this.es.close();
-            // Check if session expired
             try {
               const res = await fetch('/api/auth/check');
               if (res.status === 401) { window.location.reload(); return; }
@@ -986,11 +1020,12 @@
           if (l.includes('error')) return 'text-red-400';
           if (l.includes('warning') || l.includes('warn')) return 'text-yellow-400';
           if (l.includes('server started') || l.includes('successfully')) return 'text-green-400';
-          return 'text-gray-300';
+          return 'text-gray-400';
         }
       };
     }
 
+    // ═══ Mod Panel ════════════════════════════════════════
     function modPanel() {
       return {
         mods: [],
@@ -1048,13 +1083,13 @@
       };
     }
 
+    // ═══ Schedule Panel ═══════════════════════════════════
     function schedulePanel() {
       return {
-        times: [],
-        newTime: '',
+        interval: '0',
         dirty: false,
         saving: false,
-        _original: [],
+        _original: '0',
 
         async init() {
           try {
@@ -1062,26 +1097,10 @@
             if (res.status === 401) { window.location.reload(); return; }
             if (res.ok) {
               const data = await res.json();
-              this.times = data.restart_times || [];
-              this._original = [...this.times];
+              this.interval = String(data.interval_hours || 0);
+              this._original = this.interval;
             }
           } catch(e) { console.error('Failed to load schedule', e); }
-        },
-
-        addTime() {
-          if (!this.newTime) return;
-          const t = this.newTime.substring(0, 5); // HH:MM
-          if (!this.times.includes(t)) {
-            this.times.push(t);
-            this.times.sort();
-            this.dirty = true;
-          }
-          this.newTime = '';
-        },
-
-        removeTime(index) {
-          this.times.splice(index, 1);
-          this.dirty = true;
         },
 
         async saveSchedule() {
@@ -1090,14 +1109,15 @@
             const res = await fetch('/api/schedule', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ restart_times: this.times })
+              body: JSON.stringify({ interval_hours: parseInt(this.interval) })
             });
             if (res.status === 401) { window.location.reload(); return; }
             const data = await res.json();
             if (res.ok) {
-              this._original = [...this.times];
+              this._original = this.interval;
               this.dirty = false;
-              window._alpineApp?.showToast('success', 'Schedule saved');
+              const label = this.interval === '0' ? 'Auto restart disabled' : `Auto restart: every ${this.interval}h`;
+              window._alpineApp?.showToast('success', label);
             } else {
               window._alpineApp?.showToast('error', data.detail || 'Failed to save schedule');
             }
@@ -1110,6 +1130,7 @@
       };
     }
 
+    // ═══ Backup Panel ═════════════════════════════════════
     function backupPanel() {
       return {
         backups: [],
@@ -1167,7 +1188,7 @@
         },
 
         async restoreBackup(filename) {
-          if (!confirm('Restore backup ' + filename + '?\n\nThe server must be stopped. This will overwrite current save files.')) return;
+          if (!confirm('Restore ' + filename + '?\n\nServer must be stopped. This overwrites current saves.')) return;
           try {
             const res = await fetch(`/api/backups/${encodeURIComponent(filename)}/restore`, { method: 'POST' });
             if (res.status === 401) { window.location.reload(); return; }

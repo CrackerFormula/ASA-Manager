@@ -1,12 +1,13 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 SCHEDULE_FILE = Path("/serverdata/config/schedule.json")
+VALID_INTERVALS = [0, 3, 6, 12, 18, 24]
 
 
 class Scheduler:
@@ -18,34 +19,24 @@ class Scheduler:
     def _ensure_dir(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
-    def get_schedule(self) -> list[str]:
+    def get_schedule(self) -> dict:
         if not self._path.exists():
-            return []
+            return {"interval_hours": 0}
         try:
             data = json.loads(self._path.read_text())
-            return data.get("restart_times", [])
+            # Migrate old format
+            if "restart_times" in data and "interval_hours" not in data:
+                return {"interval_hours": 0}
+            return {"interval_hours": data.get("interval_hours", 0)}
         except (json.JSONDecodeError, KeyError):
-            return []
+            return {"interval_hours": 0}
 
-    def set_schedule(self, times: list[str]) -> None:
-        # Validate HH:MM format
-        for t in times:
-            parts = t.split(":")
-            if len(parts) != 2:
-                raise ValueError(f"Invalid time format: {t!r} (expected HH:MM)")
-            try:
-                h, m = int(parts[0]), int(parts[1])
-                if not (0 <= h <= 23 and 0 <= m <= 59):
-                    raise ValueError
-            except ValueError:
-                raise ValueError(f"Invalid time format: {t!r} (expected HH:MM)")
+    def set_interval(self, hours: int) -> None:
+        if hours not in VALID_INTERVALS:
+            raise ValueError(f"Invalid interval: {hours}h (valid: {VALID_INTERVALS})")
         self._ensure_dir()
-        self._path.write_text(json.dumps({"restart_times": times}, indent=2))
-        logger.info("Schedule set to: %s", times)
-
-    def clear_schedule(self) -> None:
-        self.set_schedule([])
-        logger.info("Schedule cleared")
+        self._path.write_text(json.dumps({"interval_hours": hours}, indent=2))
+        logger.info("Restart interval set to: %dh", hours)
 
     async def start(self) -> None:
         if self._running:
@@ -66,27 +57,24 @@ class Scheduler:
         logger.info("Scheduler stopped")
 
     async def _scheduler_loop(self) -> None:
-        triggered: set[str] = set()
+        last_restart = time.monotonic()
         while self._running:
             try:
-                # Use local time so scheduled times match user expectations
-                now = datetime.now()
-                current_time = now.strftime("%H:%M")
-                times = self.get_schedule()
+                schedule = self.get_schedule()
+                interval = schedule["interval_hours"]
 
-                # Reset triggered set at the start of each minute
-                if current_time not in triggered:
-                    triggered.clear()
-
-                if current_time in times and current_time not in triggered:
-                    triggered.add(current_time)
-                    logger.info("Scheduled restart triggered at %s (local)", current_time)
-                    try:
-                        from app.server_manager import server_manager
-                        await server_manager.restart()
-                        logger.info("Scheduled restart completed")
-                    except Exception:
-                        logger.exception("Scheduled restart failed")
+                if interval > 0:
+                    elapsed = time.monotonic() - last_restart
+                    remaining = (interval * 3600) - elapsed
+                    if remaining <= 0:
+                        logger.info("Scheduled restart triggered (every %dh)", interval)
+                        try:
+                            from app.server_manager import server_manager
+                            await server_manager.restart()
+                            logger.info("Scheduled restart completed")
+                        except Exception:
+                            logger.exception("Scheduled restart failed")
+                        last_restart = time.monotonic()
 
                 await asyncio.sleep(30)
             except asyncio.CancelledError:
