@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Wine requires a finite stack size (default 'unlimited' breaks address space layout)
+ulimit -s 8192
+
 # =============================================================================
 # ARK: Survival Ascended Server Launch Script
 # =============================================================================
@@ -19,13 +22,35 @@ RCON_ENABLED="${RCON_ENABLED:-True}"
 BATTLEYE="${BATTLEYE:-false}"
 MOD_IDS="${MOD_IDS:-}"
 CUSTOM_SERVER_ARGS="${CUSTOM_SERVER_ARGS:-}"
+STEAM_SERVER_TOKEN="${STEAM_SERVER_TOKEN:-}"
 
 # Override settings from web-managed config file if it exists
+# Parse safely line by line instead of sourcing (prevents shell injection)
 SERVER_CONFIG="/serverdata/config/server.conf"
 if [[ -f "${SERVER_CONFIG}" ]]; then
-    # shellcheck disable=SC1090
-    source "${SERVER_CONFIG}"
-    # Re-encode SESSION_NAME spaces after sourcing
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip comments and empty lines
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        # Only process lines matching KEY=VALUE pattern
+        if [[ "$line" =~ ^([A-Z_]+)=(.*)$ ]]; then
+            key="${BASH_REMATCH[1]}"
+            val="${BASH_REMATCH[2]}"
+            # Strip surrounding quotes from value
+            val="${val#\"}"
+            val="${val%\"}"
+            val="${val#\'}"
+            val="${val%\'}"
+            # Only allow known keys
+            case "$key" in
+                MAP_NAME|SESSION_NAME|MAX_PLAYERS|SERVER_PASSWORD|SERVER_ADMIN_PASSWORD|\
+                ASA_PORT|QUERY_PORT|RCON_PORT|RCON_ENABLED|BATTLEYE|MOD_IDS|CUSTOM_SERVER_ARGS|\
+                STEAM_SERVER_TOKEN)
+                    declare "$key=$val"
+                    ;;
+            esac
+        fi
+    done < "${SERVER_CONFIG}"
+    # Re-encode SESSION_NAME spaces after loading config
     SESSION_NAME="${SESSION_NAME// /%20}"
 fi
 
@@ -44,7 +69,7 @@ if [[ -z "${SERVER_ADMIN_PASSWORD}" ]]; then
     exit 1
 fi
 
-PROTON_VERSION="${PROTON_VERSION:-GE-Proton9-27}"
+PROTON_VERSION="${PROTON_VERSION:-GE-Proton10-32}"
 PROTON="/opt/proton-ge/${PROTON_VERSION}/proton"
 ARK_BINARY="/serverdata/ark-server/ShooterGame/Binaries/Win64/ArkAscendedServer.exe"
 
@@ -80,16 +105,34 @@ if [[ "${BATTLEYE,,}" == "false" || "${BATTLEYE,,}" == "0" ]]; then
     LAUNCH_FLAGS+=("-NoBattlEye")
 fi
 
+# Steam Game Server Login Token (GSLT)
+if [[ -n "${STEAM_SERVER_TOKEN}" ]]; then
+    LAUNCH_FLAGS+=("-GameLoginToken=${STEAM_SERVER_TOKEN}")
+fi
+
 # Append mods if specified
 if [[ -n "${MOD_IDS}" ]]; then
     LAUNCH_FLAGS+=("-mods=${MOD_IDS}")
 fi
 
-# Append any custom args
+# Append any custom args (noglob prevents wildcard expansion)
 if [[ -n "${CUSTOM_SERVER_ARGS}" ]]; then
+    set -f
     # shellcheck disable=SC2206
     LAUNCH_FLAGS+=(${CUSTOM_SERVER_ARGS})
+    set +f
 fi
+
+# Proton environment (headless server — no GPU, use WineD3D)
+export PROTON_USE_WINED3D="${PROTON_USE_WINED3D:-1}"
+export PROTON_LOG="${PROTON_LOG:-1}"
+# Override version.dll for Proton compatibility
+export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:-version=n,b}"
+
+# Steam Game Server API needs the App ID
+echo "2430930" > /serverdata/ark-server/ShooterGame/Binaries/Win64/steam_appid.txt
+export SteamAppId=2430930
+export SteamGameId=2430930
 
 echo "Starting ARK: Survival Ascended Server..."
 echo "  Map:          ${MAP_NAME}"
@@ -101,4 +144,7 @@ echo "  Max Players:  ${MAX_PLAYERS}"
 echo "  BattlEye:     ${BATTLEYE}"
 [[ -n "${MOD_IDS}" ]] && echo "  Mods:         ${MOD_IDS}"
 
-exec "${PROTON}" run "${ARK_BINARY}" "${SERVER_ARGS}" "${LAUNCH_FLAGS[@]}"
+# cd into binary directory (required by ARK/UE5 for relative path resolution)
+cd /serverdata/ark-server/ShooterGame/Binaries/Win64
+
+exec "${PROTON}" run ./ArkAscendedServer.exe "${SERVER_ARGS}" "${LAUNCH_FLAGS[@]}"

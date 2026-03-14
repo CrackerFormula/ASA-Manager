@@ -1,6 +1,6 @@
+import hashlib
 import hmac
 import logging
-import secrets
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
@@ -13,7 +13,12 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-SECRET_KEY = secrets.token_hex(32)
+# Derive SECRET_KEY deterministically so sessions survive container restarts.
+# Prefer explicit SECRET_KEY env var; fall back to deriving from WEB_PASSWORD.
+if settings.SECRET_KEY:
+    SECRET_KEY = settings.SECRET_KEY
+else:
+    SECRET_KEY = hashlib.sha256(f"asa-manager-{settings.WEB_PASSWORD}".encode()).hexdigest()
 signer = TimestampSigner(SECRET_KEY)
 
 limiter = Limiter(key_func=get_remote_address)

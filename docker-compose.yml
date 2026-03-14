@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     ports:
       - "7777:7777/udp"
+      - "7777:7777/tcp"
       - "7778:7778/udp"
       - "27015:27015/udp"
       - "27020:27020/tcp"
@@ -44,3 +45,4 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s

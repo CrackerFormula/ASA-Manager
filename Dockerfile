@@ -24,8 +24,6 @@ RUN pacman -S --noconfirm --needed \
     bash \
     curl \
     wget \
-    git \
-    unzip \
     tar \
     jq \
     sudo \
@@ -48,7 +46,8 @@ RUN pacman -S --noconfirm --needed \
     python-pip \
     supervisor \
     net-tools \
-    iproute2
+    iproute2 && \
+    pacman -Scc --noconfirm
 
 # Generate en_US.UTF-8 locale
 RUN sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
@@ -80,7 +79,7 @@ RUN /opt/steamcmd/steamcmd.sh +quit || true
 # =============================================================================
 FROM arch-base AS proton-ge
 
-ARG PROTON_VERSION=GE-Proton9-27
+ARG PROTON_VERSION=GE-Proton10-32
 ARG PROTON_URL=https://github.com/GloriousEggroll/proton-ge-custom/releases/download/${PROTON_VERSION}/${PROTON_VERSION}.tar.gz
 
 RUN mkdir -p /opt/proton-ge && \
@@ -136,6 +135,6 @@ COPY app/ /app/app/
 RUN chown -R ark:ark /app
 
 # Expose ports
-EXPOSE 7777/udp 7778/udp 27020/tcp 8080/tcp
+EXPOSE 7777/udp 7777/tcp 7778/udp 27015/udp 27020/tcp 8080/tcp
 
 ENTRYPOINT ["/entrypoint.sh"]

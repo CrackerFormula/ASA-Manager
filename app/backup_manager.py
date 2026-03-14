@@ -82,15 +82,39 @@ class BackupManager:
         if not filepath.exists():
             raise FileNotFoundError(f"Backup not found: {filename}")
 
-        # Remove existing save directory contents and extract
-        if self._save_dir.exists():
-            shutil.rmtree(self._save_dir)
-        self._save_dir.mkdir(parents=True, exist_ok=True)
+        tmp_dir = self._save_dir.parent / (self._save_dir.name + "_restore_tmp")
 
-        with tarfile.open(filepath, "r:gz") as tar:
-            tar.extractall(path=self._save_dir.parent, filter="data")
+        try:
+            # Extract to a temporary directory first
+            if tmp_dir.exists():
+                shutil.rmtree(tmp_dir)
+            tmp_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info("Restored backup: %s", filename)
+            with tarfile.open(filepath, "r:gz") as tar:
+                tar.extractall(path=tmp_dir, filter="data")
+
+            # Verify the extracted content exists
+            extracted_save = tmp_dir / "Saved"
+            if not extracted_save.exists():
+                raise RuntimeError(
+                    f"Extraction succeeded but expected 'Saved' directory not found"
+                )
+
+            # Extraction verified — now safe to remove the original
+            if self._save_dir.exists():
+                shutil.rmtree(self._save_dir)
+
+            # Move extracted content into place
+            shutil.move(str(extracted_save), str(self._save_dir))
+            logger.info("Restored backup: %s", filename)
+
+        except Exception:
+            logger.exception("Failed to restore backup: %s", filename)
+            raise
+        finally:
+            # Clean up temp directory if it still exists
+            if tmp_dir.exists():
+                shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def _prune_old_backups(self) -> None:
         backups = sorted(self._backup_dir.glob("backup_*.tar.gz"), reverse=True)

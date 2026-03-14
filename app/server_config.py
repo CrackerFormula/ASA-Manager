@@ -19,6 +19,7 @@ ALLOWED_KEYS = {
     "BATTLEYE",
     "MOD_IDS",
     "CUSTOM_SERVER_ARGS",
+    "STEAM_SERVER_TOKEN",
 }
 
 
@@ -47,23 +48,44 @@ class ServerConfig:
         return result
 
     def set_config(self, data: dict[str, str]) -> dict[str, str]:
-        """Write config values. Only ALLOWED_KEYS are persisted."""
+        """Merge config values into existing config. Only ALLOWED_KEYS are persisted."""
         self._ensure_dir()
+        # Merge with existing config so callers don't need to send all keys
+        existing = self.get_config()
+        existing.update(data)
         lines = ["# ASA-Manager server configuration", "# Managed by web UI — changes take effect on next server start", ""]
-        for key, value in data.items():
+        for key, value in existing.items():
             key = key.strip()
             if key not in ALLOWED_KEYS:
                 logger.warning("Ignoring unknown config key: %s", key)
                 continue
+            value = self._sanitize_value(key, str(value))
             # Quote values that contain spaces
-            if " " in str(value):
+            if " " in value:
                 lines.append(f'{key}="{value}"')
             else:
                 lines.append(f"{key}={value}")
         lines.append("")
         self._path.write_text("\n".join(lines))
-        logger.info("Server config saved: %s", {k: v for k, v in data.items() if k in ALLOWED_KEYS})
+        # Redact passwords in log output
+        safe_log = {
+            k: "***" if "PASSWORD" in k else v
+            for k, v in existing.items() if k in ALLOWED_KEYS
+        }
+        logger.info("Server config saved: %s", safe_log)
         return self.get_config()
+
+    @staticmethod
+    def _sanitize_value(key: str, value: str) -> str:
+        """Remove shell-dangerous characters from config values."""
+        # Strip characters that could cause shell injection when sourced
+        dangerous = set('`$;|&\n\r\\')
+        if key == "CUSTOM_SERVER_ARGS":
+            # Allow hyphens, equals, dots, slashes but still strip injection chars
+            return "".join(c for c in value if c not in dangerous)
+        # For all other keys, also strip double quotes (they're added by the writer)
+        dangerous.add('"')
+        return "".join(c for c in value if c not in dangerous)
 
 
 server_config = ServerConfig()

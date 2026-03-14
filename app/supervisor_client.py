@@ -16,7 +16,7 @@ def _get_proxy() -> xmlrpc.client.ServerProxy:
             transport=SupervisorTransport(None, None, serverurl=SUPERVISOR_SOCKET),
         )
     except ImportError:
-        logger.warning("supervisor package not available, using fallback transport")
+        logger.debug("supervisor package not available, using fallback transport")
         import http.client
         import socket
 

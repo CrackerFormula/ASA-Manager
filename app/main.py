@@ -1,5 +1,4 @@
 import logging
-import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -28,7 +27,7 @@ async def lifespan(app: FastAPI):
         logger.critical("WEB_PASSWORD is not set. Refusing to start.")
         logger.critical("Set the WEB_PASSWORD environment variable.")
         logger.critical("=" * 60)
-        sys.exit(1)
+        raise RuntimeError("WEB_PASSWORD is not set")
 
     if settings.SERVER_ADMIN_PASSWORD in ("changeme", ""):
         logger.warning("=" * 60)
@@ -36,7 +35,10 @@ async def lifespan(app: FastAPI):
         logger.warning("Change this before exposing to the internet!")
         logger.warning("=" * 60)
 
-    log_manager.start_tailing(settings.ARK_LOG_PATH)
+    log_manager.start_tailing(
+        settings.ARK_LOG_PATH,
+        "/serverdata/logs/arkserver.log",
+    )
     await scheduler.start()
     yield
     await scheduler.stop()
@@ -45,7 +47,7 @@ async def lifespan(app: FastAPI):
     try:
         if await server_manager.is_running():
             logger.info("Shutdown: initiating graceful ARK server stop...")
-            await server_manager._do_stop()
+            await server_manager.stop()
             logger.info("Shutdown: ARK server stopped")
     except Exception:
         logger.exception("Shutdown: failed to gracefully stop ARK server")

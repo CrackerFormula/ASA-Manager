@@ -1,8 +1,9 @@
-from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
     MAP_NAME: str = "TheIsland_WP"
     SESSION_NAME: str = "ARK Server"
     SERVER_ADMIN_PASSWORD: str = "changeme"
@@ -19,12 +20,9 @@ class Settings(BaseSettings):
     ARK_LOG_PATH: str = "/serverdata/ark-server/ShooterGame/Saved/Logs/ShooterGame.log"
     SERVER_DIR: str = "/serverdata/ark-server"
     WEB_PASSWORD: str = ""
+    SECRET_KEY: str = ""
     SESSION_MAX_AGE: int = 86400
     SECURE_COOKIES: bool = False
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 settings = Settings()

@@ -1,13 +1,17 @@
 import asyncio
+import logging
+import os
 from collections import deque
 from typing import AsyncGenerator
+
+logger = logging.getLogger(__name__)
 
 
 class LogManager:
     def __init__(self, maxlen: int = 500):
         self._buffer: deque[str] = deque(maxlen=maxlen)
         self._subscribers: list[asyncio.Queue] = []
-        self._tail_task: asyncio.Task | None = None
+        self._tail_tasks: list[asyncio.Task] = []
 
     def _append(self, line: str) -> None:
         self._buffer.append(line)
@@ -37,76 +41,103 @@ class LogManager:
             except ValueError:
                 pass
 
-    async def tail_file(self, path: str) -> None:
+    async def tail_file(self, path: str, prefix: str = "") -> None:
+        """Tail a log file using position-based polling for reliability."""
         while True:
             try:
-                async with _open_and_tail(path, self._append) as _:
-                    pass
+                # Wait for file to exist
+                while not os.path.exists(path):
+                    await asyncio.sleep(2)
+
+                try:
+                    stat = os.stat(path)
+                    open_inode = stat.st_ino
+                except OSError:
+                    await asyncio.sleep(2)
+                    continue
+
+                # Use synchronous file I/O in executor for reliable tailing
+                loop = asyncio.get_event_loop()
+                pos = 0
+
+                # Load existing content
+                def _read_existing():
+                    with open(path, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                        return content, f.tell()
+
+                content, pos = await loop.run_in_executor(None, _read_existing)
+                if content:
+                    for line in content.rstrip("\n").split("\n"):
+                        stripped = line.rstrip("\r")
+                        if stripped:
+                            self._append(prefix + stripped)
+
+                # Poll for new content
+                partial = ""
+                while True:
+                    def _read_new(position, leftover):
+                        try:
+                            size = os.path.getsize(path)
+                        except OSError:
+                            return None, position, leftover
+                        # File was truncated/rotated — reset
+                        if size < position:
+                            position = 0
+                        if size == position:
+                            return [], position, leftover
+                        with open(path, "r", encoding="utf-8", errors="replace") as f:
+                            f.seek(position)
+                            new_data = f.read()
+                            new_pos = f.tell()
+                        # Handle partial lines
+                        text = leftover + new_data
+                        parts = text.split("\n")
+                        # Last element is either empty (line ended with \n) or a partial line
+                        remaining = parts[-1]
+                        complete_lines = parts[:-1]
+                        return complete_lines, new_pos, remaining
+
+                    result = await loop.run_in_executor(None, _read_new, pos, partial)
+                    lines, pos, partial = result
+
+                    if lines is None:
+                        # File gone
+                        logger.debug("Log file gone: %s", path)
+                        break
+
+                    for line in lines:
+                        stripped = line.rstrip("\r")
+                        if stripped:
+                            self._append(prefix + stripped)
+
+                    # Check for inode change (log rotation)
+                    try:
+                        current_inode = os.stat(path).st_ino
+                        if current_inode != open_inode:
+                            logger.debug("Log rotation detected for %s", path)
+                            break
+                    except OSError:
+                        logger.debug("Log file inaccessible: %s", path)
+                        break
+
+                    await asyncio.sleep(0.5)
+            except asyncio.CancelledError:
+                raise
             except Exception:
-                pass
+                logger.warning("Error tailing %s, retrying in 2s", path, exc_info=True)
             await asyncio.sleep(2)
 
-    def start_tailing(self, path: str) -> None:
-        if self._tail_task is None or self._tail_task.done():
-            self._tail_task = asyncio.create_task(self.tail_file(path))
+    def start_tailing(self, *paths: str) -> None:
+        """Start tailing one or more log files concurrently."""
+        for path in paths:
+            task = asyncio.create_task(self.tail_file(path))
+            self._tail_tasks.append(task)
 
     def stop(self) -> None:
-        if self._tail_task:
-            self._tail_task.cancel()
-            self._tail_task = None
-
-
-class _open_and_tail:
-    """Async context manager that tails a file, handling rotation."""
-
-    def __init__(self, path: str, callback):
-        self.path = path
-        self.callback = callback
-
-    async def __aenter__(self):
-        import aiofiles
-        import os
-
-        # Wait for file to exist
-        while not os.path.exists(self.path):
-            await asyncio.sleep(2)
-
-        self._file = await aiofiles.open(self.path, "r", encoding="utf-8", errors="replace")
-        await self._file.seek(0, 2)  # seek to end
-        self._run_task = asyncio.create_task(self._run())
-        return self
-
-    async def _run(self):
-        import aiofiles
-        import os
-
-        try:
-            while True:
-                line = await self._file.readline()
-                if line:
-                    self.callback(line.rstrip("\n"))
-                else:
-                    # Check for rotation: file gone or inode changed
-                    try:
-                        current_inode = os.stat(self.path).st_ino
-                        # aiofiles wraps the real file object; access its
-                        # fileno via the underlying _file attribute.
-                        raw_file = self._file._file
-                        fd_inode = os.fstat(raw_file.fileno()).st_ino
-                        if current_inode != fd_inode:
-                            break
-                    except (OSError, AttributeError):
-                        break
-                    await asyncio.sleep(0.25)
-        finally:
-            await self._file.close()
-
-    async def __aexit__(self, *_):
-        self._run_task.cancel()
-        try:
-            await self._run_task
-        except asyncio.CancelledError:
-            pass
+        for task in self._tail_tasks:
+            task.cancel()
+        self._tail_tasks.clear()
 
 
 log_manager = LogManager()

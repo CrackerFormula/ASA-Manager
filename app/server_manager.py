@@ -49,36 +49,58 @@ class ServerManager:
     async def _do_stop(self) -> dict:
         async with self._lock:
             if not await self.is_running():
+                self._stopping = False
                 return {"status": "not_running", "message": "Server is not running"}
 
-            self._stopping = True
             try:
                 logger.info("Saving world before stop...")
-                await self._rcon("saveworld")
-                await asyncio.sleep(30)
+                save_result = await self._rcon("saveworld")
+                logger.info("saveworld result: %s", save_result)
+                await asyncio.sleep(5)
 
                 logger.info("Sending doexit command...")
-                await self._rcon("doexit")
+                exit_result = await self._rcon("doexit")
+                logger.info("doexit result: %s", exit_result)
                 await asyncio.sleep(10)
 
-                # Let supervisord handle final cleanup (SIGTERM → SIGKILL after stopwaitsecs)
+                # If process is still running, stop via supervisord
                 if await self.is_running():
-                    logger.info("Process still running, stopping via supervisord...")
+                    logger.info("Process still running after RCON doexit, stopping via supervisord...")
                     try:
                         await supervisor_client.stop_process()
                     except Exception:
                         logger.warning("supervisord stop_process failed (process may have already exited)")
+                    await asyncio.sleep(5)
+
+                # Kill any lingering Wine/Proton processes
+                await self._kill_wine_processes()
 
                 logger.info("ARK server stopped")
                 return {"status": "stopped", "message": "Server stopped"}
             finally:
                 self._stopping = False
 
+    async def _kill_wine_processes(self) -> None:
+        """Kill lingering Wine/Proton processes that may survive after stop."""
+        for proc_name in ("wineserver", "wine64-preloader", "ArkAscendedServer.exe"):
+            try:
+                kill = await asyncio.create_subprocess_exec(
+                    "killall", "-9", proc_name,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                await kill.wait()
+            except Exception:
+                pass
+
     async def stop(self) -> dict:
-        if not await self.is_running():
-            return {"status": "not_running", "message": "Server is not running"}
-        if self._stopping:
-            return {"status": "stopping", "message": "Server stop already in progress"}
+        # Check state under lock to prevent race conditions
+        async with self._lock:
+            if self._stopping:
+                return {"status": "stopping", "message": "Server stop already in progress"}
+            if not await self.is_running():
+                return {"status": "not_running", "message": "Server is not running"}
+            self._stopping = True
 
         self._stop_task = asyncio.create_task(self._do_stop())
         self._stop_task.add_done_callback(self._on_stop_done)
@@ -92,7 +114,11 @@ class ServerManager:
 
     async def restart(self) -> dict:
         stop_result = await self._do_stop()
+        if stop_result.get("status") == "error":
+            return {"status": "error", "message": f"Stop failed: {stop_result.get('message')}", "stop": stop_result}
         start_result = await self.start()
+        if start_result.get("status") == "error":
+            return {"status": "error", "message": f"Start failed: {start_result.get('message')}", "start": start_result}
         return {"status": "restarted", "stop": stop_result, "start": start_result}
 
     async def status(self) -> dict:
@@ -130,18 +156,26 @@ class ServerManager:
         }
 
     async def install(self) -> dict:
+        if self._lock.locked():
+            return {"status": "error", "message": "Another operation is in progress"}
+        async with self._lock:
+            return await self._do_install()
+
+    async def _do_install(self) -> dict:
         if await self.is_running():
             return {"status": "error", "message": "Cannot install while server is running"}
 
-        steamcmd = "/usr/bin/steamcmd"
+        steamcmd = "/opt/steamcmd/steamcmd.sh"
         if not os.path.exists(steamcmd):
-            steamcmd = "steamcmd"
+            steamcmd = "/usr/bin/steamcmd"
+        if not os.path.exists(steamcmd):
+            return {"status": "error", "message": "SteamCMD not found"}
 
         cmd = [
             steamcmd,
             "+force_install_dir", settings.SERVER_DIR,
             "+login", "anonymous",
-            "+app_update", "2430930",
+            "+app_update", "2430930", "validate",
             "+quit",
         ]
         proc = await asyncio.create_subprocess_exec(

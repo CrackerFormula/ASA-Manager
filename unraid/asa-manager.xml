@@ -34,16 +34,9 @@
   <!-- Environment Variables: Security -->
   <Config Name="Web Password" Target="WEB_PASSWORD" Default="" Description="REQUIRED - Password for the web UI login. Container will NOT start without this." Type="Variable" Display="always" Required="true" Mask="true"></Config>
   <Config Name="Admin Password" Target="SERVER_ADMIN_PASSWORD" Default="" Description="RCON and in-game admin password." Type="Variable" Display="always" Required="true" Mask="true"></Config>
-  <Config Name="Server Password" Target="SERVER_PASSWORD" Default="" Description="Password players need to join. Leave blank for a public server." Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="Secret Key" Target="SECRET_KEY" Default="" Description="Optional secret key for signing session cookies. If blank, derived from WEB_PASSWORD automatically. Set explicitly if you want sessions to survive password changes." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Session Max Age" Target="SESSION_MAX_AGE" Default="86400" Description="Session cookie lifetime in seconds. Default 86400 = 24 hours." Type="Variable" Display="advanced" Required="false" Mask="false">86400</Config>
   <Config Name="Secure Cookies" Target="SECURE_COOKIES" Default="false" Description="Set to true if using HTTPS via reverse proxy." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
-
-  <!-- Environment Variables: Server -->
-  <Config Name="Session Name" Target="SESSION_NAME" Default="My ARK Server" Description="Server name shown in the in-game server browser." Type="Variable" Display="always" Required="true" Mask="false">My ARK Server</Config>
-  <Config Name="Map Name" Target="MAP_NAME" Default="TheIsland_WP" Description="ARK map to load. Examples: TheIsland_WP, Aberration_WP, ScorchedEarth_WP, TheCenter_WP" Type="Variable" Display="always" Required="true" Mask="false">TheIsland_WP</Config>
-  <Config Name="Max Players" Target="MAX_PLAYERS" Default="70" Description="Maximum number of players allowed on the server." Type="Variable" Display="always" Required="false" Mask="false">70</Config>
-  <Config Name="Mod IDs" Target="MOD_IDS" Default="" Description="Comma-separated list of CurseForge mod IDs to install. Example: 927090,880477" Type="Variable" Display="always" Required="false" Mask="false"></Config>
-  <Config Name="BattlEye" Target="BATTLEYE" Default="False" Description="Enable BattlEye anti-cheat (True/False). Requires additional setup." Type="Variable" Display="advanced" Required="false" Mask="false">False</Config>
-  <Config Name="Custom Server Args" Target="CUSTOM_SERVER_ARGS" Default="" Description="Additional command-line arguments appended to the server launch command." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
 
   <!-- Environment Variables: System -->
   <Config Name="Instance Name" Target="INSTANCE_NAME" Default="ASA_Server_1" Description="Internal instance name for Proton prefix." Type="Variable" Display="advanced" Required="false" Mask="false">ASA_Server_1</Config>

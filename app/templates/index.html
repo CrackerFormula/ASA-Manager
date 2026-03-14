@@ -60,7 +60,7 @@
       <!-- Start -->
       <button
         class="btn-action bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-        :disabled="busy"
+        :disabled="busy || serverStatus.running || serverStatus.stopping"
         @click="serverAction('start')">
         <span x-show="!busy || activeAction !== 'start'">▶ Start</span>
         <span x-show="busy && activeAction === 'start'" class="flex items-center gap-1"><span class="spinner"></span> Starting…</span>
@@ -69,7 +69,7 @@
       <!-- Stop -->
       <button
         class="btn-action bg-red-700 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-        :disabled="busy"
+        :disabled="busy || !serverStatus.running || serverStatus.stopping"
         @click="confirmAction('stop', 'Are you sure you want to stop the server? Active players will be disconnected.')">
         <span x-show="!busy || activeAction !== 'stop'">■ Stop</span>
         <span x-show="busy && activeAction === 'stop'" class="flex items-center gap-1"><span class="spinner"></span> Stopping…</span>
@@ -78,8 +78,8 @@
       <!-- Restart -->
       <button
         class="btn-action bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-        :disabled="busy"
-        @click="serverAction('restart')">
+        :disabled="busy || !serverStatus.running || serverStatus.stopping"
+        @click="confirmAction('restart', 'Are you sure you want to restart? Active players will be disconnected.')">
         <span x-show="!busy || activeAction !== 'restart'">↺ Restart</span>
         <span x-show="busy && activeAction === 'restart'" class="flex items-center gap-1"><span class="spinner"></span> Restarting…</span>
       </button>
@@ -87,7 +87,7 @@
       <!-- Install/Update -->
       <button
         class="btn-action bg-blue-700 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-        :disabled="busy"
+        :disabled="busy || serverStatus.running || serverStatus.stopping"
         @click="confirmAction('install', 'Are you sure? This will download/update the server files.')">
         <span x-show="!busy || activeAction !== 'install'">⬇ Install / Update</span>
         <span x-show="busy && activeAction === 'install'" class="flex items-center gap-1"><span class="spinner"></span> Installing…</span>
@@ -204,6 +204,13 @@
           </label>
         </div>
 
+        <!-- Steam Server Token -->
+        <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-center">
+          <label class="text-xs text-gray-400 font-mono">STEAM_SERVER_TOKEN</label>
+          <input type="text" x-model="config.STEAM_SERVER_TOKEN" placeholder="GSLT from steamcommunity.com/dev/managegameservers"
+            class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
+        </div>
+
         <!-- Separator: Gameplay -->
         <div class="border-t border-gray-700 pt-2 mt-2">
           <span class="text-xs text-gray-500 uppercase tracking-wider">Gameplay</span>
@@ -269,7 +276,10 @@
               <div class="space-y-3">
                 <template x-for="(pair, idx) in settingsData[activeSection]" :key="idx">
                   <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-start">
-                    <label class="text-xs text-gray-400 pt-2 break-all font-mono" x-text="pair.key"></label>
+                    <label class="text-xs text-gray-400 pt-2 break-all cursor-help"
+                      :class="INI_LABELS[pair.key] ? '' : 'font-mono'"
+                      :title="pair.key"
+                      x-text="INI_LABELS[pair.key] || pair.key"></label>
                     <div class="relative">
 
                       <!-- Password field -->
@@ -342,6 +352,7 @@
                   :class="saveMsgOk ? 'text-green-400' : 'text-red-400'"
                   class="text-xs transition-opacity"></span>
               </div>
+              <p class="mt-2 text-xs text-gray-500">Changes take effect after a server restart.</p>
             </form>
           </div>
         </template>
@@ -419,7 +430,7 @@
         <span class="text-gray-300 font-semibold text-sm">Scheduled Restarts</span>
       </div>
       <div class="p-4 space-y-3">
-        <div class="text-xs text-gray-400">Times are in UTC (24-hour format).</div>
+        <div class="text-xs text-gray-400">Times are in container local time (24-hour format).</div>
         <div class="flex gap-2">
           <input type="time" x-model="newTime"
             class="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-green-500 font-mono">
@@ -432,7 +443,7 @@
         <ul class="space-y-1">
           <template x-for="(t, i) in times" :key="i">
             <li class="flex items-center justify-between bg-gray-800 rounded px-3 py-1.5">
-              <span class="text-xs font-mono text-gray-200" x-text="t + ' UTC'"></span>
+              <span class="text-xs font-mono text-gray-200" x-text="t"></span>
               <button @click="removeTime(i)"
                 class="text-xs text-red-400 hover:text-red-300 transition-colors">Remove</button>
             </li>
@@ -480,6 +491,151 @@
   </div>
 
   <script>
+    // ── Shared constants
+    const KNOWN_MAPS = [
+      'TheIsland_WP', 'ScorchedEarth_WP', 'Aberration_WP', 'Extinction_WP',
+      'Ragnarok_WP', 'TheCenter_WP', 'Valguero_WP', 'CrystalIsles_WP',
+      'LostIsland_WP', 'Fjordur_WP', 'Genesis_WP', 'Genesis2_WP',
+    ];
+
+    // Human-readable labels for common ARK INI settings (raw key → friendly name)
+    const INI_LABELS = {
+      // ServerSettings
+      'AllowHideDamageSourceFromLogs': 'Hide Damage Source in Logs',
+      'AllowThirdPersonPlayer': 'Allow Third-Person View',
+      'AlwaysNotifyPlayerJoined': 'Notify on Player Join',
+      'AlwaysNotifyPlayerLeft': 'Notify on Player Leave',
+      'AutoSavePeriodMinutes': 'Auto-Save Interval (min)',
+      'DayCycleSpeedScale': 'Day Speed Multiplier',
+      'NightTimeSpeedScale': 'Night Speed Multiplier',
+      'DayTimeSpeedScale': 'Day Time Speed',
+      'DifficultyOffset': 'Difficulty Offset',
+      'DinoCharacterFoodDrainMultiplier': 'Dino Food Drain Rate',
+      'DinoCharacterHealthRecoveryMultiplier': 'Dino Health Recovery Rate',
+      'DinoCharacterStaminaDrainMultiplier': 'Dino Stamina Drain Rate',
+      'DinoDamageMultiplier': 'Dino Damage Multiplier',
+      'DinoResistanceMultiplier': 'Dino Resistance Multiplier',
+      'DinoCountMultiplier': 'Dino Spawn Count Multiplier',
+      'DisableStructureDecayPvE': 'Disable Structure Decay (PvE)',
+      'GlobalVoiceChat': 'Global Voice Chat',
+      'HarvestAmountMultiplier': 'Harvest Amount Multiplier',
+      'HarvestHealthMultiplier': 'Harvest Health Multiplier',
+      'MaxPersonalTamedDinos': 'Max Personal Tamed Dinos',
+      'MaxPlatformSaddleStructureLimit': 'Platform Saddle Structure Limit',
+      'MaxStructuresInRange': 'Max Structures in Range',
+      'MaxTamedDinos': 'Max Tamed Dinos (Server)',
+      'NoTributeDownloads': 'Disable Tribute Downloads',
+      'OverrideOfficialDifficulty': 'Override Official Difficulty',
+      'OverrideStructurePlatformPrevention': 'Override Platform Build Prevention',
+      'OxygenSwimSpeedStatMultiplier': 'Oxygen Swim Speed Multiplier',
+      'PerPlatformMaxStructuresMultiplier': 'Platform Max Structures Multiplier',
+      'PvEStructureDecayDestructionPeriod': 'PvE Decay Destruction Period',
+      'PvEStructureDecayPeriodMultiplier': 'PvE Decay Period Multiplier',
+      'PlayerCharacterFoodDrainMultiplier': 'Player Food Drain Rate',
+      'PlayerCharacterHealthRecoveryMultiplier': 'Player Health Recovery Rate',
+      'PlayerCharacterStaminaDrainMultiplier': 'Player Stamina Drain Rate',
+      'PlayerCharacterWaterDrainMultiplier': 'Player Water Drain Rate',
+      'PlayerDamageMultiplier': 'Player Damage Multiplier',
+      'PlayerResistanceMultiplier': 'Player Resistance Multiplier',
+      'ProximityChat': 'Proximity Chat',
+      'RCONEnabled': 'RCON Enabled',
+      'RCONPort': 'RCON Port',
+      'RCONServerGameLogBuffer': 'RCON Log Buffer Size',
+      'ResourcesRespawnPeriodMultiplier': 'Resource Respawn Period',
+      'ServerAdminPassword': 'Admin Password',
+      'ServerCrosshair': 'Show Crosshair',
+      'ServerForceNoHUD': 'Force No HUD',
+      'ServerHardcore': 'Hardcore Mode',
+      'ServerPassword': 'Server Password',
+      'ServerPVE': 'PvE Mode',
+      'ShowMapPlayerLocation': 'Show Player on Map',
+      'StructureDamageMultiplier': 'Structure Damage Multiplier',
+      'StructureResistanceMultiplier': 'Structure Resistance Multiplier',
+      'TamingSpeedMultiplier': 'Taming Speed Multiplier',
+      'XPMultiplier': 'XP Multiplier',
+      'EnablePvPGamma': 'Enable PvP Gamma',
+      'EnablePvEGamma': 'Enable PvE Gamma',
+      'SpectatorPassword': 'Spectator Password',
+      'ActiveMods': 'Active Mods',
+      'MaxPlayers': 'Max Players',
+      'KickIdlePlayersPeriod': 'Kick Idle Players After (sec)',
+      'AutoDestroyOldStructuresMultiplier': 'Auto-Destroy Old Structures Rate',
+      'UseOptimizedHarvestingHealth': 'Optimized Harvest Health',
+      'ClampResourceHarvestDamage': 'Clamp Harvest Damage',
+      'PvPStructureDecay': 'PvP Structure Decay',
+      'AllowFlyerCarryPvE': 'Allow Flyer Carry (PvE)',
+      'bAllowPlatformSaddleMultiFloors': 'Allow Platform Multi-Floors',
+      'PreventOfflinePvP': 'Prevent Offline PvP',
+      'PreventOfflinePvPInterval': 'Offline PvP Protection Delay (sec)',
+      'bPassiveDefensesDamageRiderlessDinos': 'Passive Defenses Damage Riderless Dinos',
+      'RaidDinoCharacterFoodDrainMultiplier': 'Raid Dino Food Drain',
+      'ItemStackSizeMultiplier': 'Item Stack Size Multiplier',
+      'AllowRaidDinoFeeding': 'Allow Raid Dino Feeding',
+      'EnableExtraStructurePreventionVolumes': 'Extra Structure Prevention Areas',
+      'bFilterTribeNames': 'Filter Tribe Names',
+      'bPvEDisableFriendlyFire': 'Disable Friendly Fire (PvE)',
+      'DisablePvEGamma': 'Disable PvE Gamma',
+      'bDisableStructurePlacementCollision': 'Disable Structure Placement Collision',
+      'AllowCaveBuildingPvE': 'Allow Cave Building (PvE)',
+      'AllowCaveBuildingPvP': 'Allow Cave Building (PvP)',
+      'bUseCorpseLocator': 'Show Corpse Locator',
+      'bShowCreativeMode': 'Show Creative Mode',
+      'PreventDiseases': 'Prevent Diseases',
+      'NonPermanentDiseases': 'Non-Permanent Diseases',
+      'RandomSupplyCratePoints': 'Randomize Supply Drops',
+      'SupplyCrateLootQualityMultiplier': 'Supply Drop Quality Multiplier',
+      'FishingLootQualityMultiplier': 'Fishing Loot Quality Multiplier',
+      'CraftingSkillBonusMultiplier': 'Crafting Skill Bonus Multiplier',
+      'AllowMultipleAttachedC4': 'Allow Multiple C4',
+      'CropGrowthSpeedMultiplier': 'Crop Growth Speed',
+      'CropDecaySpeedMultiplier': 'Crop Decay Speed',
+      'LayEggIntervalMultiplier': 'Egg Lay Interval Multiplier',
+      'PoopIntervalMultiplier': 'Poop Interval Multiplier',
+      'MatingIntervalMultiplier': 'Mating Interval Multiplier',
+      'EggHatchSpeedMultiplier': 'Egg Hatch Speed',
+      'BabyMatureSpeedMultiplier': 'Baby Mature Speed',
+      'BabyFoodConsumptionSpeedMultiplier': 'Baby Food Consumption Rate',
+      'BabyCuddleIntervalMultiplier': 'Baby Cuddle Interval',
+      'BabyCuddleGracePeriodMultiplier': 'Baby Cuddle Grace Period',
+      'BabyCuddleLoseImprintQualitySpeedMultiplier': 'Imprint Quality Loss Speed',
+      'BabyImprintingStatScaleMultiplier': 'Imprint Stat Scale',
+      'BabyImprintAmountMultiplier': 'Imprint Amount Multiplier',
+      'HairGrowthSpeedMultiplier': 'Hair Growth Speed',
+      'CustomRecipeEffectivenessMultiplier': 'Custom Recipe Effectiveness',
+      'CustomRecipeSkillMultiplier': 'Custom Recipe Skill Multiplier',
+      'PlatformSaddleBuildAreaBoundsMultiplier': 'Platform Build Area Multiplier',
+      'StructurePickupTimeAfterPlacement': 'Structure Pickup Time (sec)',
+      'StructurePickupHoldDuration': 'Structure Pickup Hold Time',
+      'AllowIntegratedSPlusStructures': 'Allow S+ Structures',
+      'DayCycleSpeedScale': 'Day Cycle Speed',
+      'DayTimeSpeedScale': 'Daytime Speed',
+      'NightTimeSpeedScale': 'Nighttime Speed',
+      'ResourcesRespawnPeriodMultiplier': 'Resource Respawn Rate',
+      'HarvestHealthMultiplier': 'Harvest Health Multiplier',
+      'PlayerCharacterWaterDrainMultiplier': 'Player Water Drain',
+      'PlayerCharacterFoodDrainMultiplier': 'Player Food Drain',
+      'PlayerCharacterStaminaDrainMultiplier': 'Player Stamina Drain',
+      'PlayerCharacterHealthRecoveryMultiplier': 'Player Health Recovery',
+      'DinoCharacterFoodDrainMultiplier': 'Dino Food Drain',
+      'DinoCharacterStaminaDrainMultiplier': 'Dino Stamina Drain',
+      'DinoCharacterHealthRecoveryMultiplier': 'Dino Health Recovery',
+      'PlayerResistanceMultiplier': 'Player Resistance',
+      'DinoResistanceMultiplier': 'Dino Resistance',
+      'StructureDamageMultiplier': 'Structure Damage',
+      'StructureResistanceMultiplier': 'Structure Resistance',
+      'WildDinoCharacterFoodDrainMultiplier': 'Wild Dino Food Drain',
+      'WildDinoTorporDrainMultiplier': 'Wild Dino Torpor Drain',
+      'PassiveTameIntervalMultiplier': 'Passive Tame Interval',
+      // SessionSettings
+      'SessionName': 'Session Name',
+      'QueryPort': 'Query Port',
+      'Port': 'Game Port',
+      'MultiHome': 'Bind IP Address',
+      // MessageOfTheDay
+      'Message': 'Message of the Day',
+      'Duration': 'MOTD Display Duration (sec)',
+    };
+
     // ── Monotonic counter for toast IDs
     let _toastIdCounter = 0;
 
@@ -593,6 +749,7 @@
           RCON_ENABLED: 'True',
           BATTLEYE: 'False',
           CUSTOM_SERVER_ARGS: '',
+          STEAM_SERVER_TOKEN: '',
         },
         battleye: false,
         rconEnabled: true,
@@ -602,11 +759,7 @@
         saveMsg: '',
         saveMsgOk: true,
 
-        knownMaps: [
-          'TheIsland_WP', 'TheIsland', 'ScorchedEarth_WP', 'ScorchedEarth_P',
-          'Aberration_WP', 'Aberration_P', 'Extinction', 'Genesis', 'Genesis2',
-          'CrystalIsles', 'Ragnarok', 'Valguero_P', 'LostIsland', 'Fjordur',
-        ],
+        knownMaps: KNOWN_MAPS,
 
         async init() {
           try {
@@ -667,22 +820,7 @@
         saveMsgOk: true,
         showPassword: {},
 
-        knownMaps: [
-          'TheIsland_WP',
-          'TheIsland',
-          'ScorchedEarth_WP',
-          'ScorchedEarth_P',
-          'Aberration_WP',
-          'Aberration_P',
-          'Extinction',
-          'Genesis',
-          'Genesis2',
-          'CrystalIsles',
-          'Ragnarok',
-          'Valguero_P',
-          'LostIsland',
-          'Fjordur',
-        ],
+        knownMaps: KNOWN_MAPS,
 
         async init() {
           try {
@@ -785,6 +923,7 @@
           // Load recent logs
           try {
             const res = await fetch('/api/logs/recent?n=100');
+            if (res.status === 401) { window.location.href = '/login'; return; }
             if (res.ok) {
               const data = await res.json();
               this.lines = data;
@@ -893,7 +1032,7 @@
 
         async removeMod(modId) {
           try {
-            const res = await fetch(`/api/mods/${modId}`, { method: 'DELETE' });
+            const res = await fetch(`/api/mods/${encodeURIComponent(modId)}`, { method: 'DELETE' });
             if (res.status === 401) { window.location.reload(); return; }
             const data = await res.json();
             if (res.ok) {
@@ -1013,7 +1152,7 @@
         async deleteBackup(filename) {
           if (!confirm('Delete backup ' + filename + '?')) return;
           try {
-            const res = await fetch(`/api/backups/${filename}`, { method: 'DELETE' });
+            const res = await fetch(`/api/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' });
             if (res.status === 401) { window.location.reload(); return; }
             if (res.ok) {
               window._alpineApp?.showToast('success', 'Backup deleted');
@@ -1030,7 +1169,7 @@
         async restoreBackup(filename) {
           if (!confirm('Restore backup ' + filename + '?\n\nThe server must be stopped. This will overwrite current save files.')) return;
           try {
-            const res = await fetch(`/api/backups/${filename}/restore`, { method: 'POST' });
+            const res = await fetch(`/api/backups/${encodeURIComponent(filename)}/restore`, { method: 'POST' });
             if (res.status === 401) { window.location.reload(); return; }
             const data = await res.json();
             if (res.ok) {

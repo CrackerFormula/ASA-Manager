@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,8 @@ class Scheduler:
         triggered: set[str] = set()
         while self._running:
             try:
-                now = datetime.now(timezone.utc)
+                # Use local time so scheduled times match user expectations
+                now = datetime.now()
                 current_time = now.strftime("%H:%M")
                 times = self.get_schedule()
 
@@ -79,7 +80,7 @@ class Scheduler:
 
                 if current_time in times and current_time not in triggered:
                     triggered.add(current_time)
-                    logger.info("Scheduled restart triggered at %s UTC", current_time)
+                    logger.info("Scheduled restart triggered at %s (local)", current_time)
                     try:
                         from app.server_manager import server_manager
                         await server_manager.restart()
