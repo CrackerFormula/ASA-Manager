@@ -81,17 +81,49 @@ class ServerManager:
                 self._stopping = False
 
     async def _kill_wine_processes(self) -> None:
-        """Kill lingering Wine/Proton processes that may survive after stop."""
-        for proc_name in ("wineserver", "wine64-preloader", "ArkAscendedServer.exe"):
-            try:
+        """Kill all lingering Wine/Proton processes that survive after stop.
+
+        Finds all processes owned by the ark user and kills everything except
+        supervisord, Xvfb, uvicorn, and this Python process itself.
+        """
+        try:
+            # Get all PIDs owned by the ark user
+            proc = await asyncio.create_subprocess_exec(
+                "ps", "-u", "ark", "-o", "pid=,comm=",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            stdout, _ = await proc.communicate()
+            if not stdout:
+                return
+
+            # Whitelist processes we want to keep alive
+            keep = {"Xvfb", "python", "python3", "uvicorn"}
+            pids_to_kill = []
+            for line in stdout.decode().strip().splitlines():
+                parts = line.strip().split(None, 1)
+                if len(parts) < 2:
+                    continue
+                pid_str, comm = parts[0], parts[1]
+                if any(k in comm for k in keep):
+                    continue
+                try:
+                    pids_to_kill.append(int(pid_str))
+                except ValueError:
+                    continue
+
+            if pids_to_kill:
+                logger.info("Killing %d lingering processes: %s", len(pids_to_kill), pids_to_kill)
                 kill = await asyncio.create_subprocess_exec(
-                    "killall", "-9", proc_name,
+                    "kill", "-9", *[str(p) for p in pids_to_kill],
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                 )
                 await kill.wait()
-            except Exception:
-                pass
+                # Give kernel time to reap
+                await asyncio.sleep(2)
+        except Exception:
+            logger.warning("Failed to kill Wine processes", exc_info=True)
 
     async def stop(self) -> dict:
         # Check state under lock to prevent race conditions
