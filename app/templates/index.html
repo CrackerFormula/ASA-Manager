@@ -315,62 +315,62 @@
             <form @submit.prevent="saveSection(activeSection)">
               <div class="space-y-2">
                 <template x-for="(item, idx) in getVisibleSettings(activeSection)" :key="item._idx">
+                  <div>
+                    <!-- Category divider (common mode only) -->
+                    <div x-show="!showAdvanced && item._category && item._isFirstInCategory"
+                         class="ini-category" x-text="item._category"></div>
 
-                  <!-- Category divider (common mode only) -->
-                  <template x-if="!showAdvanced && item._category && item._isFirstInCategory">
-                    <div class="ini-category" x-text="item._category"></div>
-                  </template>
+                    <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-start">
+                      <label class="text-xs text-gray-400 pt-2 break-all cursor-help"
+                        :class="INI_LABELS[item.pair.key] ? '' : 'font-mono'"
+                        :title="item.pair.key"
+                        x-text="INI_LABELS[item.pair.key] || item.pair.key"></label>
+                      <div>
 
-                  <div class="grid grid-cols-[1fr_1.5fr] gap-3 items-start">
-                    <label class="text-xs text-gray-400 pt-2 break-all cursor-help"
-                      :class="INI_LABELS[item.pair.key] ? '' : 'font-mono'"
-                      :title="item.pair.key"
-                      x-text="INI_LABELS[item.pair.key] || item.pair.key"></label>
-                    <div>
+                        <!-- Password field -->
+                        <template x-if="item.pair.key.toLowerCase().includes('password')">
+                          <div class="flex gap-1">
+                            <input
+                              :type="showPassword[item.pair.key] ? 'text' : 'password'"
+                              :value="getEdited(activeSection, item._idx, item.pair.value)"
+                              @input="updateSetting(activeSection, item._idx, $event.target.value)"
+                              class="flex-1 bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono min-w-0">
+                            <button type="button"
+                              @click="showPassword[item.pair.key] = !showPassword[item.pair.key]"
+                              class="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 shrink-0 transition-colors">
+                              <span x-text="showPassword[item.pair.key] ? 'Hide' : 'Show'"></span>
+                            </button>
+                          </div>
+                        </template>
 
-                      <!-- Password field -->
-                      <template x-if="item.pair.key.toLowerCase().includes('password')">
-                        <div class="flex gap-1">
-                          <input
-                            :type="showPassword[item.pair.key] ? 'text' : 'password'"
+                        <!-- Boolean toggle -->
+                        <template x-if="!item.pair.key.toLowerCase().includes('password') && isBool(item.pair.value)">
+                          <label class="toggle mt-1">
+                            <input type="checkbox"
+                              :checked="parseBool(getEdited(activeSection, item._idx, item.pair.value))"
+                              @change="updateSetting(activeSection, item._idx, $event.target.checked ? 'True' : 'False')">
+                            <span class="toggle-slider"></span>
+                          </label>
+                        </template>
+
+                        <!-- Number input -->
+                        <template x-if="!item.pair.key.toLowerCase().includes('password') && !isBool(item.pair.value) && isNumber(item.pair.key, item.pair.value)">
+                          <input type="number"
+                            :step="isMultiplier(item.pair.key) ? '0.1' : '1'"
                             :value="getEdited(activeSection, item._idx, item.pair.value)"
                             @input="updateSetting(activeSection, item._idx, $event.target.value)"
-                            class="flex-1 bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono min-w-0">
-                          <button type="button"
-                            @click="showPassword[item.pair.key] = !showPassword[item.pair.key]"
-                            class="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 shrink-0 transition-colors">
-                            <span x-text="showPassword[item.pair.key] ? 'Hide' : 'Show'"></span>
-                          </button>
-                        </div>
-                      </template>
+                            class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
+                        </template>
 
-                      <!-- Boolean toggle -->
-                      <template x-if="!item.pair.key.toLowerCase().includes('password') && isBool(item.pair.value)">
-                        <label class="toggle mt-1">
-                          <input type="checkbox"
-                            :checked="parseBool(getEdited(activeSection, item._idx, item.pair.value))"
-                            @change="updateSetting(activeSection, item._idx, $event.target.checked ? 'True' : 'False')">
-                          <span class="toggle-slider"></span>
-                        </label>
-                      </template>
+                        <!-- Default text input -->
+                        <template x-if="!item.pair.key.toLowerCase().includes('password') && !isBool(item.pair.value) && !isNumber(item.pair.key, item.pair.value)">
+                          <input type="text"
+                            :value="getEdited(activeSection, item._idx, item.pair.value)"
+                            @input="updateSetting(activeSection, item._idx, $event.target.value)"
+                            class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
+                        </template>
 
-                      <!-- Number input -->
-                      <template x-if="!item.pair.key.toLowerCase().includes('password') && !isBool(item.pair.value) && isNumber(item.pair.key, item.pair.value)">
-                        <input type="number"
-                          :step="isMultiplier(item.pair.key) ? '0.1' : '1'"
-                          :value="getEdited(activeSection, item._idx, item.pair.value)"
-                          @input="updateSetting(activeSection, item._idx, $event.target.value)"
-                          class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
-                      </template>
-
-                      <!-- Default text input -->
-                      <template x-if="!item.pair.key.toLowerCase().includes('password') && !isBool(item.pair.value) && !isNumber(item.pair.key, item.pair.value)">
-                        <input type="text"
-                          :value="getEdited(activeSection, item._idx, item.pair.value)"
-                          @input="updateSetting(activeSection, item._idx, $event.target.value)"
-                          class="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-3 py-2 text-xs text-gray-100 font-mono">
-                      </template>
-
+                      </div>
                     </div>
                   </div>
                 </template>
